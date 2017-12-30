@@ -1,0 +1,87 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginRight="@dimen/activity_horizontal_margin"
+        android:layout_marginLeft="@dimen/activity_horizontal_margin">
+
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.6"
+            android:gravity="left|center"
+            android:padding="8dp"
+            android:text="Average Noise"
+            android:textStyle="bold"/>
+
+
+        <TextView
+            android:id="@+id/tvSoundStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="8dp" />
+
+
+    </LinearLayout>
+
+    <RelativeLayout
+        android:id="@+id/relative"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/chart1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/activity_vertical_margin"
+            android:layout_marginBottom="80dp" />
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center|center_horizontal"
+            android:gravity="center"
+            android:padding="10dp"
+            android:orientation="horizontal"
+            android:layout_alignParentBottom="true"
+            >
+
+            <android.support.design.widget.FloatingActionButton
+                android:id="@+id/btntoggelRec"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_gravity="left|center_horizontal"
+                android:layout_marginRight="@dimen/activity_horizontal_margin"
+                android:layout_weight="2"
+                android:src="@drawable/ic_play_arrow_white_24dp" />
+
+            <android.support.design.widget.FloatingActionButton
+                android:id="@+id/btnStop"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_weight="2"
+                android:src="@drawable/ic_pause_white_24dp" />
+
+            <android.support.design.widget.FloatingActionButton
+                android:id="@+id/btnPlayRec"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_gravity="center_horizontal|right"
+                android:layout_marginLeft="@dimen/activity_horizontal_margin"
+                android:layout_weight="2"
+                android:src="@drawable/ic_publish_white_24dp" />
+        </LinearLayout>
+
+    </RelativeLayout>
+
+
+</LinearLayout>

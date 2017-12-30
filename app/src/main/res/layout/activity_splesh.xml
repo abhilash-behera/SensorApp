@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.sensorapp.SpleshActivity">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical">
+
+
+            <ImageView
+                android:layout_width="180dp"
+                android:layout_height="150dp"
+                app:srcCompat="@drawable/spleshlogo"
+                android:layout_centerHorizontal="true"
+                android:id="@+id/imageViewSplash" />
+
+            <TextView
+                android:id="@+id/textViewSplash"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CrODA Gator"
+                android:textSize="20sp"
+                android:textColor="@color/colorPrimary"
+                android:textStyle="bold"
+                android:layout_centerHorizontal="true"
+                android:layout_gravity="center|center_vertical"
+                android:gravity="center"
+                android:layout_marginTop="10dp"
+                android:layout_below="@+id/imageViewSplash"/>
+        </LinearLayout>
+
+    </RelativeLayout>
+
+
+
+</android.support.design.widget.CoordinatorLayout>

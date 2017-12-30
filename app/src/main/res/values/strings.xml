@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">CrODA Gator</string>
+
+    <!--Map Type-->
+    <string name="Normal">Normal</string>
+    <string name="Satellite">Satellite</string>
+    <string name="Terrain">Terrain</string>
+    <string name="Hybrid">Hybrid</string>
+
+    <string name="Wifi_Signal">Wi-Fi Signal</string>
+    <string name="Mobile_Data">Mobile Data</string>
+    <string name="GPS">GPS</string>
+    <string name="network_edge">EDGE</string>
+    <string name="network_3g"> 3G</string>
+    <string name="network_detecting">Network : Detecting </string>
+    <string name="update_speed" formatted="false">%s kbit/sec</string>
+    <string name="update_downloaded" formatted="false"> %s kb</string>
+    <string name="update_connectionspeed" formatted="false">%s ms</string>
+    <string name="update_downloaded_complete" formatted="false">%s kb/s</string>
+
+</resources>

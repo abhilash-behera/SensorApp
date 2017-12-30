@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/activity_gmap"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.google.android.gms.maps.MapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/linearLayout1"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="#fafafa"
+        android:padding="10dp"
+        android:orientation="vertical"
+        android:id="@+id/linearLayout1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="3"
+                android:text="Source"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/start"
+                android:padding="2dp"
+                android:textAlignment="center"
+                android:layout_gravity="center_vertical"
+                android:gravity="center"/>
+            <android.support.v7.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="7"
+                app:cardElevation="2dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="#000"
+                    android:text="Not Selected..."
+                    android:gravity="center"
+                    android:textAlignment="center"
+                    android:id="@+id/txtSource"
+                    android:padding="2dp"
+                    android:layout_gravity="center_vertical"
+                    android:singleLine="true"
+                    android:ellipsize="marquee"/>
+            </android.support.v7.widget.CardView>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="5dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="3"
+                android:text="Destination"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/destination"
+                android:padding="2dp"
+                android:textAlignment="center"
+                android:layout_gravity="center_vertical"
+                android:gravity="center"/>
+            <android.support.v7.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="7"
+                app:cardElevation="2dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="#000"
+                    android:text="Not Selected..."
+                    android:gravity="center"
+                    android:textAlignment="center"
+                    android:id="@+id/txtDestination"
+                    android:padding="2dp"
+                    android:layout_gravity="center_vertical"
+                    android:singleLine="true"
+                    android:ellipsize="marquee"/>
+            </android.support.v7.widget.CardView>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="17dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <Button
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="2dp"
+                android:layout_marginRight="2dp"
+                android:text="A*"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#000"
+                android:id="@+id/btnA"/>
+
+            <Button
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="2dp"
+                android:layout_marginRight="2dp"
+                android:text="DFS"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#000"
+                android:id="@+id/btnDfs"/>
+
+            <android.support.design.widget.FloatingActionButton
+                android:id="@+id/fabTrack"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/search"
+                android:layout_marginLeft="4dp"
+                android:layout_marginRight="2dp" />
+
+            <android.support.design.widget.FloatingActionButton
+                android:id="@+id/fabFav"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="4dp"
+                android:layout_marginRight="2dp"
+                android:layout_gravity="center"
+                android:layout_weight="1"
+                android:src="@drawable/ic_star_rate_white_18dp" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>
