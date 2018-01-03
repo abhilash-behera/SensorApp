@@ -1,11 +1,9 @@
 package com.sensorapp;
 
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.support.design.widget.CoordinatorLayout;
@@ -17,10 +15,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.View;
-import android.widget.TextView;
 import android.widget.Toast;
-
-import com.google.android.gms.maps.model.Dash;
 
 import java.util.Arrays;
 
@@ -129,7 +124,7 @@ public class DashBoardActivity extends AppCompatActivity implements View.OnClick
                         startActivity(intent);
                     }
                     else if (selectedText.equals("Wi-Fi Signal")) {
-                        intent = new Intent(getApplicationContext(), Wifi_Signal.class);
+                        intent = new Intent(getApplicationContext(), WifiActivity.class);
                         intent.putExtra("Wifi", "Wi-Fi Signal");
                     }
                     else if (selectedText.equals("Mobile Data")) {

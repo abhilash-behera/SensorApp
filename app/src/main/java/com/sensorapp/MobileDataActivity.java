@@ -35,7 +35,7 @@ import es.dmoral.toasty.Toasty;
 
 public class MobileDataActivity extends AppCompatActivity {
     //Private fields
-    private static final String TAG = Wifi_Signal.class.getSimpleName();
+    private static final String TAG = WifiActivity.class.getSimpleName();
     private static final int EXPECTED_SIZE_IN_BYTES = 1048576;//1MB 1024*1024
 
     private static final double EDGE_THRESHOLD = 176.0;
@@ -181,21 +181,25 @@ public class MobileDataActivity extends AppCompatActivity {
                 //store the result in database...
                 GPSTracker tracker=new GPSTracker(MobileDataActivity.this);
                 Location location=tracker.getLocation();
-                Log.d("awesome","Got location: "+location);
-
-                MobileData mobileData=new MobileData(
-                        mTxtConnectionSpeed.getText().toString(),
-                        mTxtSpeed.getText().toString().replace(" ","").replace("kb/s",""),
-                        mTxtNetwork.getText().toString(),
-                        mTxtProgress.getText().toString(),
-                        String.valueOf(location.getLatitude()),
-                        String.valueOf(location.getLongitude())
-                );
-
-                if (databaseHelper.insertMobileData(mobileData)){
-                    Toasty.success(getApplicationContext(),"Data Save Successfully", Toast.LENGTH_LONG).show();
+                if(location==null){
+                    Toasty.error(MobileDataActivity.this,"Could not get your location. Please check GPS settings",Toast.LENGTH_LONG).show();
                 }else{
-                    Toasty.error(getApplicationContext(),"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                    Log.d("awesome","Got location: "+location);
+
+                    MobileData mobileData=new MobileData(
+                            mTxtConnectionSpeed.getText().toString(),
+                            mTxtSpeed.getText().toString().replace(" ","").replace("kb/s",""),
+                            mTxtNetwork.getText().toString(),
+                            mTxtProgress.getText().toString(),
+                            String.valueOf(location.getLatitude()),
+                            String.valueOf(location.getLongitude())
+                    );
+
+                    if (databaseHelper.insertMobileData(mobileData)){
+                        Toasty.success(getApplicationContext(),"Data Save Successfully", Toast.LENGTH_LONG).show();
+                    }else{
+                        Toasty.error(getApplicationContext(),"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                    }
                 }
             }
         });

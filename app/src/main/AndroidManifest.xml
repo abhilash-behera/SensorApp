@@ -73,10 +73,10 @@
         <!-- Goolge API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBU4fMsaVPFQyLKaxPOgoQrhRl2No-woXM" />
+            android:value="AIzaSyAVGOnVbI3caSMRCIKtDnhVficWwdl0DI8" />
 
         <activity android:name=".PlanPathViewActivity" />
-        <activity android:name=".Wifi_Signal" />
+        <activity android:name=".WifiActivity" />
         <activity android:name=".MobileDataActivity" />
         <activity android:name=".GpsActivity" />
         <activity android:name=".FavouritesViewActivity" />
@@ -84,6 +84,9 @@
         <activity android:name=".GyroscopeActivity" />
         <activity android:name=".AccelerometerActivity" />
         <activity android:name=".CompassActivity" />
+        <meta-data
+            android:name="io.fabric.ApiKey"
+            android:value="7903d5eea50a9ed59b32f79efde38ed42a0b9a98" />
     </application>
 
 </manifest>

@@ -152,51 +152,49 @@ public class RecordNoiseActivity extends AppCompatActivity implements View.OnCli
 
     @Override
     public void onClick(View view) {
-
         if(view==record){
             start= System.currentTimeMillis();
             Log.d("awesome","Start time: "+start);
             startRecording();
-
-        }
-            if(view==stop){
-                end=System.currentTimeMillis();
-                Log.d("awesome","End time: "+end);
-
-                totalRecordingTime=end-start;
-                Log.d("awesome","Total recording time: "+totalRecordingTime);
-
-                 if (isRecording) {
-                    //calculate average sound db here..
+        }else if(view==stop){
+            end=System.currentTimeMillis();
+            Log.d("awesome","End time: "+end);
+            totalRecordingTime=end-start;
+            Log.d("awesome","Total recording time: "+totalRecordingTime);
+            if (isRecording) {
+                //calculate average sound db here..
                     /*double db21 = 20 * Math.log10((db / totalRecordingTime));
                     Log.d("awesome","db21: "+db21);
                     avgDb = (int) (Math.round(db21));
                     avgDb=(int)Math.round(db);
                     Log.d("awesome","avgDb: "+avgDb);*/
-                    tvSoundStatus.setText("" + avgDb + "db");
-                 }
-                releaseRecorder();
+                tvSoundStatus.setText("" + avgDb + "db");
             }
-            if (view==play){
-                    //recording in phone..myfile/all/devicestorage/mysensoraudio
-                    //save the recording in data base..
-                Location myLocation=new GPSTracker(RecordNoiseActivity.this).getLocation();
-                Log.d("awesome","My Location: "+myLocation);
-                NoiseData noiseData=new NoiseData(
+            releaseRecorder();
+        }else if(view==play) {
+            Location myLocation = new GPSTracker(RecordNoiseActivity.this).getLocation();
+            if (myLocation == null) {
+                Toasty.error(RecordNoiseActivity.this, "Unable to get your location. Please check GPS settings.", Toast.LENGTH_LONG).show();
+            } else {
+                Log.d("awesome", "My Location: " + myLocation);
+                NoiseData noiseData = new NoiseData(
                         audioPath,
                         String.valueOf(avgDb),
                         String.valueOf(myLocation.getLatitude()),
-                        String.valueOf(myLocation.getLongitude()));
-                    boolean result = dbDatabaseHelper.insertAudio(noiseData);
-                    if (result) {
-                        Toasty.success(getApplicationContext(), "Recording Successfully saved", Toast.LENGTH_LONG).show();
-                    }else{
-                        Log.d("abhilash","Data not saved to database: "+result);
-                        Toasty.error(RecordNoiseActivity.this,"Something went wrong. Please try again.").show();
-                    }
+                        String.valueOf(myLocation.getLongitude())
+                );
+                boolean result = dbDatabaseHelper.insertAudio(noiseData);
+                if (result) {
+                    Toasty.success(getApplicationContext(), "Recording Successfully saved", Toast.LENGTH_LONG).show();
+                } else {
+                    Log.d("abhilash", "Noise Data not saved to database");
+                    Toasty.error(RecordNoiseActivity.this, "Something went wrong. Please try again.").show();
                 }
+            }
+        }
     }
-//stop recording and relese the recoder..
+
+    //stop recording and relese the recoder..
     private void releaseRecorder() {
         if (recorder != null) {
 

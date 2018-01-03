@@ -7,10 +7,17 @@ import android.net.NetworkInfo;
 import java.util.HashMap;
 
 /**
- * Created by Abhilash on 24-11-2017.
+ * Created by Abhilash on 24-11-2017
  */
 
 public class Utils {
+    private static final String DIRECTION_API = "https://maps.googleapis.com/maps/api/directions/json?origin=";
+    public static final String API_KEY = "AIzaSyAVGOnVbI3caSMRCIKtDnhVficWwdl0DI8";
+
+    public static String getUrl(String originLat, String originLon, String destinationLat, String destinationLon){
+        return DIRECTION_API + originLat+","+originLon+"&destination="+destinationLat+","+destinationLon+"&key="+API_KEY;
+    }
+
     private static HashMap<Integer,String> alphaValues;
     public static boolean isNetworkAvailable(Context context){
         ConnectivityManager connectivityManager=(ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);

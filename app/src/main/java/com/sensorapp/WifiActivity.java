@@ -38,10 +38,10 @@ import java.util.List;
 import es.dmoral.toasty.Toasty;
 
 
-public class Wifi_Signal extends AppCompatActivity {
+public class WifiActivity extends AppCompatActivity {
 
     //Private fields
-    private static final String TAG = Wifi_Signal.class.getSimpleName();
+    private static final String TAG = WifiActivity.class.getSimpleName();
     private static final int EXPECTED_SIZE_IN_BYTES = 1048576;//1MB 1024*1024
 
     private static final double EDGE_THRESHOLD = 176.0;
@@ -78,7 +78,7 @@ public class Wifi_Signal extends AppCompatActivity {
         tvRSSI = (TextView) findViewById(R.id.rssiSignalValue);
         coordinatorLayout = (CoordinatorLayout) findViewById(R.id.coordinatorLayout);
         //checking network connection..
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Wifi_Signal.this.CONNECTIVITY_SERVICE);
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(WifiActivity.this.CONNECTIVITY_SERVICE);
         android.net.NetworkInfo wifi = cm
                 .getNetworkInfo(ConnectivityManager.TYPE_WIFI);
         android.net.NetworkInfo datac = cm
@@ -135,7 +135,7 @@ public class Wifi_Signal extends AppCompatActivity {
             bindListeners();
 
         } else {
-            AlertDialog.Builder aBuilder = new AlertDialog.Builder(Wifi_Signal.this, R.style.CustomDialog);
+            AlertDialog.Builder aBuilder = new AlertDialog.Builder(WifiActivity.this, R.style.CustomDialog);
             aBuilder.setTitle("WIFI Setting");
             aBuilder.setCancelable(false);
             aBuilder.setMessage("WIFI is not enabled. Do you want to go to settings menu?");
@@ -188,23 +188,27 @@ public class Wifi_Signal extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 //save result to database..
-                GPSTracker gpsTracker=new GPSTracker(Wifi_Signal.this);
+                GPSTracker gpsTracker=new GPSTracker(WifiActivity.this);
                 Location location=gpsTracker.getLocation();
-                Log.d("awesome","Got location: "+location);
-                WifiData wifiData=new WifiData(
-                        mTxtConnectionSpeed.getText().toString(),
-                        mTxtSpeed.getText().toString().replace(" ","").replace("kb/s",""),
-                        mTxtNetwork.getText().toString(),
-                        mTxtProgress.getText().toString(),
-                        RSSI,
-                        String.valueOf(location.getLatitude()),
-                        String.valueOf(location.getLongitude())
-                );
-
-                if (databaseHelper.insertWifiData(wifiData)) {
-                    Toasty.success(getApplicationContext(), "Data Save Successfully", Toast.LENGTH_LONG).show();
+                if(location==null){
+                    Toasty.error(WifiActivity.this,"Could not get location. Please check your GPS settings.",Toast.LENGTH_LONG).show();
                 }else{
-                    Toasty.error(getApplicationContext(),"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                    Log.d("awesome","Got location: "+location);
+                    WifiData wifiData=new WifiData(
+                            mTxtConnectionSpeed.getText().toString(),
+                            mTxtSpeed.getText().toString().replace(" ","").replace("kb/s",""),
+                            mTxtNetwork.getText().toString(),
+                            mTxtProgress.getText().toString(),
+                            RSSI,
+                            String.valueOf(location.getLatitude()),
+                            String.valueOf(location.getLongitude())
+                    );
+
+                    if (databaseHelper.insertWifiData(wifiData)) {
+                        Toasty.success(getApplicationContext(), "Data Save Successfully", Toast.LENGTH_LONG).show();
+                    }else{
+                        Toasty.error(getApplicationContext(),"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                    }
                 }
             }
         });
