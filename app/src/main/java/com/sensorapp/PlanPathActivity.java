@@ -105,6 +105,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private FloatingActionButton fabTrack;
     private FloatingActionButton fabFav;
     private ProgressDialog progressDialog;
+    private LatLng source;
+    private LatLng destination;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -301,20 +303,160 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     progressDialog.show();
 
 
-                    new AsyncTask<Void,Integer,Void>(){
+                    new AsyncTask<Void,Integer,Integer>(){
+                        int progress=0;
                         @Override
                         protected void onPreExecute() {
                             super.onPreExecute();
                         }
 
                         @Override
-                        protected Void doInBackground(Void... voids) {
-                            for(int i=0;i<=99999;i++){
-                                int progress=(int)(((float)i/99999)*100);
-                                Log.d("awesome","progress: "+progress);
-                                publishProgress(progress);
+                        protected Integer doInBackground(Void... voids) {
+                            ArrayList<Node> nodeList=new ArrayList<>();
+
+                            Node sourceNode=new Node();
+                            sourceNode.setLatLng(source);
+                            sourceNode.setF(0);
+                            sourceNode.setG(0);
+
+                            Node destinationNode=new Node();
+                            destinationNode.setLatLng(destination);
+                            destinationNode.setF(Integer.MAX_VALUE);
+
+                            nodeList.add(sourceNode);
+                            for(LatLng latLng:dataPoints){
+                                Node node=new Node();
+                                node.setLatLng(latLng);
+                                nodeList.add(node);
                             }
-                            return null;
+                            nodeList.add(destinationNode);
+
+                            for(Node node:nodeList){
+                                Log.d("awesome","Nodelist node: "+node);
+                            }
+
+
+                            ArrayList<Node> openList=new ArrayList<>();
+                            ArrayList<Node> closeList=new ArrayList<>();
+
+
+
+
+                            openList.add(sourceNode);
+                            //openList.add(destinationNode);
+
+                            progress+=5;
+                            publishProgress(5);
+
+
+                            while(openList.size()!=0){
+                                Log.d("awesome","open list size: "+openList.size());
+                                if(progress<90){
+                                    progress+=5;
+                                    publishProgress(progress);
+                                }
+                                Node n=getNodeWithMinFValue(openList);
+                                Log.d("awesome","Node with minimum f value: "+n);
+                                Log.d("awesome","Adding node: "+n+" to close list: "+closeList.add(n));
+                                Log.d("awesome","Removing node: "+n+" from open list: "+openList.remove(n));
+
+                                for(Node successor:nodeList){
+                                    if(successor!=sourceNode&&successor!=destinationNode&&successor!=n&&!listContainsNode(closeList,successor)){
+                                        successor.setParent(n);
+
+                                        Call<DirectionApiResponse> gCall=ApiClient.getClient().getPathCoordinates(
+                                                n.getLatLng().latitude+","+n.getLatLng().longitude,
+                                                successor.getLatLng().latitude+","+successor.getLatLng().longitude,
+                                                Utils.API_KEY
+                                        );
+
+                                        try{
+                                            DirectionApiResponse gResponse=gCall.execute().body();
+                                            successor.setG(n.getG()+gResponse.getRoutes().get(0).getLegs().get(0).getDistance().getValue());
+                                            Log.d("awesome","Setting new G value: "+successor.getG()+" to node: "+successor);
+                                            if(progress<90){
+                                                progress+=2;
+                                                publishProgress(progress);
+                                            }
+                                        }catch (Exception e){
+                                            Log.d("awesome","Exception in setting new G value: "+e.toString());
+                                            return 0;
+                                        }
+
+                                        Call<DirectionApiResponse> hCall=ApiClient.getClient().getPathCoordinates(
+                                                successor.getLatLng().latitude+","+successor.getLatLng().longitude,
+                                                destination.latitude+","+destination.longitude,
+                                                Utils.API_KEY
+                                        );
+
+                                        try{
+                                            DirectionApiResponse hResponse=hCall.execute().body();
+                                            successor.setH(hResponse.getRoutes().get(0).getLegs().get(0).getDistance().getValue());
+                                            Log.d("awesome","Setting new H value: "+successor.getH()+" to node: "+successor);
+                                            if(progress<90){
+                                                progress+=2;
+                                                publishProgress(progress);
+                                            }
+                                        }catch (Exception e){
+                                            Log.d("awesome","Exception in setting new H value: "+e.toString());
+                                            return 0;
+                                        }
+
+                                        successor.setF(successor.getG()+successor.getH());
+
+                                        if(!listContainsNode(openList,successor)){
+                                            openList.add(successor);
+                                        }
+
+                                    }
+                                }
+
+                            }
+
+                            closeList.add(destinationNode);
+                            for(int i=0;i<closeList.size()-1;i++){
+                                Node s=closeList.get(i);
+                                Node d=closeList.get(i+1);
+                                Log.d("awesome","Drawing paths from node-"+s+" to node-"+d);
+
+                                Call<DirectionApiResponse> pathCall=ApiClient.getClient().getPathCoordinates(
+                                        s.getLatLng().latitude+","+s.getLatLng().longitude,
+                                        d.getLatLng().latitude+","+d.getLatLng().longitude,
+                                        Utils.API_KEY
+                                );
+
+                                try{
+                                    DirectionApiResponse directionApiResponse=pathCall.execute().body();
+                                    final PolylineOptions polylineOptions=new PolylineOptions().color(Color.BLUE).width(6);
+                                    polylineOptions.add(s.getLatLng());
+                                    List<Step> steps=directionApiResponse.getRoutes().get(0).getLegs().get(0).getSteps();
+                                    for(Step step:steps){
+                                        List<LatLng> decodedPoints=decodePoly(step.getPolyline().getPoints());
+                                        for(LatLng latLng:decodedPoints){
+                                            polylineOptions.add(latLng);
+                                        }
+                                    }
+
+                                    polylineOptions.add(d.getLatLng());
+
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            mMap.addPolyline(polylineOptions);
+                                        }
+                                    });
+
+                                    if(progress<90){
+                                        progress+=5;
+                                        publishProgress(progress);
+                                    }
+                                }catch(Exception e){
+                                    Log.d("awesome","Exception in drawing path: "+e.toString());
+                                    return 0;
+                                }
+                            }
+
+                            return 1;
                         }
 
                         @Override
@@ -324,14 +466,20 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         }
 
                         @Override
-                        protected void onPostExecute(Void aVoid) {
-                            super.onPostExecute(aVoid);
+                        protected void onPostExecute(Integer result) {
+                            super.onPostExecute(result);
+                            progressDialog.setProgress(100);
                             progressDialog.dismiss();
+                            if(result==0){
+                                Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again. ",Toast.LENGTH_LONG).show();
+                            }
                         }
                     }.execute();
                 }
             }
         });
+
+
 
         btnDfs.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -413,6 +561,68 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
             }
         });
+    }
+
+    private boolean betterNodeExists(ArrayList<Node> nodeArrayList, Node n) {
+        for(Node node:nodeArrayList){
+            if(node.getG()==n.getG()){
+                if(node.getF()<n.getF()){
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private void removeNodeFromList(ArrayList<Node> nodeArrayList, Node n) {
+        for(Node node:nodeArrayList){
+            if(node.getLatLng()==n.getLatLng()){
+                nodeArrayList.remove(node);
+            }
+        }
+    }
+
+    private boolean listContainsNode(ArrayList<Node> nodeList, Node n) {
+        for(Node node:nodeList){
+            if(node.getLatLng()==n.getLatLng()){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Node getNodeWithMaxFValue(ArrayList<Node> openList) {
+        int max_F_value=openList.get(0).getF();
+        for(Node node:openList){
+            if(node.getF()>max_F_value){
+                max_F_value=node.getF();
+            }
+        }
+
+        for (Node node:openList){
+            if(node.getF()==max_F_value){
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private Node getNodeWithMinFValue(ArrayList<Node> nodeList){
+        int min_F_value=nodeList.get(0).getF();
+        for (Node node:nodeList){
+            if(node.getF()<min_F_value){
+                min_F_value=node.getF();
+            }
+        }
+
+        for(Node node:nodeList){
+            if(node.getF()==min_F_value){
+                return node;
+            }
+        }
+
+        return null;
     }
 
     //alert dilog for mobile data..
@@ -602,6 +812,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                 .snippet(city)
                                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
                         markerSource =mMap.addMarker(markerOptions);
+                        source=markerOptions.getPosition();
                         markerSource.showInfoWindow();
                         markerCounter++;
                         String source=(state==null?"":state)+","+(city==null?"":city);
@@ -615,6 +826,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
                         markerDestination =mMap.addMarker(markerOptions);
                         markerDestination.showInfoWindow();
+                        destination=markerDestination.getPosition();
                         markerCounter++;
                         String destination=(state==null?"":state)+","+(city==null?"":city);
                         Log.d("awesome","Destination: "+destination);
@@ -625,6 +837,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         markerSource=null;
                         markerDestination.remove();
                         markerDestination=null;
+                        source=null;
+                        destination=null;
                         markerCounter=0;
                         txtSource.setText("Not selected...");
                         txtDestination.setText("Not selected...");

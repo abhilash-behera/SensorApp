@@ -8,9 +8,18 @@ import com.google.android.gms.maps.model.LatLng;
 
 public class Node {
     private LatLng latLng;
-    private float g;
-    private float h;
-    private float f;
+    private int g=0;
+    private int h=0;
+    private int f=0;
+    private Node parent;
+
+    public Node getParent() {
+        return parent;
+    }
+
+    public void setParent(Node parent) {
+        this.parent = parent;
+    }
 
     public LatLng getLatLng() {
         return latLng;
@@ -20,27 +29,27 @@ public class Node {
         this.latLng = latLng;
     }
 
-    public float getG() {
+    public int getG() {
         return g;
     }
 
-    public void setG(float g) {
+    public void setG(int g) {
         this.g = g;
     }
 
-    public float getH() {
+    public int getH() {
         return h;
     }
 
-    public void setH(float h) {
+    public void setH(int h) {
         this.h = h;
     }
 
-    public float getF() {
+    public int getF() {
         return f;
     }
 
-    public void setF(float f) {
+    public void setF(int f) {
         this.f = f;
     }
 }
