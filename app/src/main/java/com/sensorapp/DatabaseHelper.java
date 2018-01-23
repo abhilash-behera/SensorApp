@@ -47,7 +47,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String KEY_LATITUDE ="KEY_LATITUDE";
     private static final String KEY_LONGITUDE ="KEY_LONGITUDE";
     private static final String KEY_DATA_COUNT="KEY_DATA_COUNT";
-
+    private static final String KEY_POLYPOINTS ="KEY_POLYPOINTS";
+    private static final String KEY_DATAPOINTS="KEY_DATAPOINTS";
+    private static final String KEY_MEASUREMENTS="KEY_MEASUREMENTS";
+    private static final String KEY_TYPE="KEY_TYPE";
 
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, 1);
@@ -59,7 +62,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         db.execSQL("CREATE TABLE "
                 + TABLE_FAVOURITE
-                + "(id INTEGER PRIMARY KEY AUTOINCREMENT,"+KEY_SOURCE+" VARCHAR(50), "+KEY_DESTINATION+" VARCHAR(50), "+KEY_DISTANCE+" VARCHAR(50), "+KEY_AVERAGE_NOISE+" VARCHAR(50), "+KEY_ALGORITHM+" VARCHAR(50))");
+                + "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                +KEY_SOURCE+" VARCHAR(50), "
+                +KEY_DESTINATION+" VARCHAR(50), "
+                +KEY_ALGORITHM+" VARCHAR(50), "
+                + KEY_POLYPOINTS +" TEXT, "
+                +KEY_DATAPOINTS+" TEXT, "
+                +KEY_MEASUREMENTS+" TEXT, "
+                +KEY_TYPE+" VARCHAR(50))");
+
         db.execSQL("CREATE TABLE "
                 + TABLE_NOISE
                 + "(id INTEGER PRIMARY KEY AUTOINCREMENT, "+KEY_AUDIO_PATH+" VARCHAR(100), "+KEY_AVERAGE_NOISE+" VARCHAR(50),"+KEY_LATITUDE+" VARCHAR(15),"+KEY_LONGITUDE+" VARCHAR(15),"+KEY_DATA_COUNT+" INTEGER)");
@@ -75,7 +86,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE "
                 + TABLE_WIFI
                 + "(id INTEGER PRIMARY KEY AUTOINCREMENT, "+KEY_CONNECTION+" VARCHAR(50), "+KEY_SPEED+" VARCHAR(50), "+KEY_NETWORK_TYPE+" VARCHAR(50),"+KEY_PROGRESS+" VARCHAR(50), "+KEY_RSSI+" VARCHAR(50),"+KEY_LATITUDE+" VARCHAR(50),"+KEY_LONGITUDE+" VARCHAR(50),"+KEY_DATA_COUNT+" INTEGER)");
-
 
         db.execSQL("CREATE TABLE "
                 + TABLE_MOBILE
@@ -115,7 +125,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
 
-
+    //Get all noise data from database
     public ArrayList<NoiseData> getNoiseData(){
         SQLiteDatabase db=this.getReadableDatabase();
         ArrayList<NoiseData> list=new ArrayList<>();
@@ -128,6 +138,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return list;
     }
 
+    //Get all wifi data from database
     public ArrayList<WifiData> getWifiData(){
         ArrayList<WifiData> wifiDataList=new ArrayList<>();
         SQLiteDatabase db=this.getReadableDatabase();
@@ -147,6 +158,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return wifiDataList;
     }
 
+    //Get all mobile data from database
     public ArrayList<MobileData> getMobileData(){
         ArrayList<MobileData> mobileDataList=new ArrayList<>();
         SQLiteDatabase db=this.getReadableDatabase();
@@ -164,6 +176,54 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
 
         return mobileDataList;
+    }
+
+    //Get all favourite data from database
+    public ArrayList<FavouriteData> getFavouriteData(){
+        ArrayList<FavouriteData> favouriteDataList=new ArrayList<>();
+        SQLiteDatabase db=this.getReadableDatabase();
+        Cursor c=db.rawQuery("SELECT * FROM "+TABLE_FAVOURITE,null);
+        while(c.moveToNext()){
+            FavouriteData favouriteData=new FavouriteData(
+                    c.getString(1),
+                    c.getString(2),
+                    c.getString(3),
+                    c.getString(4),
+                    c.getString(5),
+                    c.getString(6),
+                    c.getString(7)
+            );
+
+            favouriteData.setId(c.getInt(0));
+
+            favouriteDataList.add(favouriteData);
+        }
+
+        c.close();
+        return favouriteDataList;
+    }
+
+    public FavouriteData getFavouriteRouteById(int id){
+        SQLiteDatabase db=this.getReadableDatabase();
+        Log.d("awesome","Finding favourite data with id: "+id);
+        String sql="SELECT * FROM "+TABLE_FAVOURITE+" WHERE id=?";
+
+        Cursor c=db.rawQuery(sql,new String[]{String.valueOf(id)});
+        if(c.getCount()>0){
+            c.moveToFirst();
+            FavouriteData favouriteData=new FavouriteData(
+                    c.getString(1),
+                    c.getString(2),
+                    c.getString(3),
+                    c.getString(4),
+                    c.getString(5),
+                    c.getString(6),
+                    c.getString(7)
+            );
+            return favouriteData;
+        }else{
+            return null;
+        }
     }
 
     public ArrayList<GPSData> getGpsData(){
@@ -394,6 +454,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    //Insert data FavouriteData
+    public boolean insertFavouriteData(FavouriteData favouriteData){
+        SQLiteDatabase db=this.getWritableDatabase();
+
+        ContentValues cv=new ContentValues();
+        cv.put(KEY_SOURCE,favouriteData.getSource());
+        cv.put(KEY_DESTINATION,favouriteData.getDestination());
+        cv.put(KEY_ALGORITHM,favouriteData.getAlgorithm());
+        cv.put(KEY_POLYPOINTS,favouriteData.getPolyPoints());
+        cv.put(KEY_DATAPOINTS,favouriteData.getDataPoints());
+        cv.put(KEY_MEASUREMENTS,favouriteData.getMeasurements());
+        cv.put(KEY_TYPE,favouriteData.getType());
+
+        Log.d("awesome","Inserting values: "+cv);
+
+        if(db.insert(TABLE_FAVOURITE,null,cv)==-1){
+            Log.d("awesome","Failed to insert favourite data");
+            return false;
+        }else{
+            Log.d("awesome","Favourite data inserted successfully");
+            return true;
+        }
+    }
+
     //Insert data GPSDATA
     public boolean insertGpsData(GPSData gpsData) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -417,7 +501,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
 
-
     public void removeSingleContact(String id) {
         //Open the database
         SQLiteDatabase database = this.getWritableDatabase();
@@ -430,7 +513,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         database.close();
     }
 
-    //Insert data FavouritesList
+    //Insert data FavouriteData
     public boolean insertFabData(String source, String destination, String distance, String averageNoise, String algorithm) {
         SQLiteDatabase db = this.getWritableDatabase();
 
@@ -467,33 +550,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             return true;
         }
     }
-
-    //Get Data FavouritesList
-    public ArrayList<FavouritesList> getAllFabList() {
-
-        SQLiteDatabase db = this.getReadableDatabase();
-        ArrayList<FavouritesList> list = new ArrayList<FavouritesList>();
-        Cursor c1 = db.rawQuery("select * from " + TABLE_FAVOURITE, null);
-
-        while (c1.moveToNext()) {
-            String id = c1.getString(0);
-            String source = c1.getString(1);
-            String destination = c1.getString(2);
-            String destance = c1.getString(3);
-            String averageNoise = c1.getString(4);
-            String algorithm = c1.getString(5);
-            if (algorithm == null) {
-                FavouritesList list1 = new FavouritesList(id, source, destination, destance, averageNoise);
-                list.add(list1);
-            }else{
-                FavouritesList list1 = new FavouritesList(id, source, destination, destance, averageNoise,algorithm);
-                list.add(list1);
-            }
-        }
-
-        return list;
-    }
-
 
     // insert list data to Accelero
     public boolean addListValue(ArrayList<String> xValue, ArrayList<String> yValue, ArrayList<String> zValue) {
@@ -559,57 +615,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     }
 
-
-
-    // insert list data to LAtLANGTABLE
-    public boolean saveLatLang(ArrayList<HashMap<Double, Double>> latLang) {
-
-        Log.e("list3", latLang.toString());
-
-        int size = latLang.size();
-        long result = -1;
-
-        SQLiteDatabase db = getWritableDatabase();
-        try {
-            for (int i = 0; i < size; i++) {
-                ContentValues cv = new ContentValues();
-                cv.put(KEY_LATLANG, String.valueOf(latLang.get(i)));
-                Log.e("Added ", "" + cv);
-                result = db.insert(TABLE_LATLANG, null, cv);
-            }
-            db.close();
-        } catch (Exception e) {
-            Log.e("Problem", e + " ");
-        }
-
-        if (result == -1) {
-            return false;
-        } else {
+    public boolean deleteFavValue(int id){
+        SQLiteDatabase db=this.getWritableDatabase();
+        if(db.delete(TABLE_FAVOURITE,"id=?",new String[]{String.valueOf(id)})>0){
+            Log.d("awesome","Favourite route deleted successfully");
             return true;
+        }else{
+            Log.d("awesome","Error in deleting Favourite route");
+            return false;
         }
-
     }
-
-    //Get Data FavouritesList
-    public ArrayList<LatLng> getLatLang() {
-
-        SQLiteDatabase db = this.getReadableDatabase();
-        ArrayList<LatLng> list = new ArrayList<LatLng>();
-        Cursor c1 = db.rawQuery("select * from " + TABLE_LATLANG, null);
-
-        while (c1.moveToNext()) {
-            String id = c1.getString(0);
-            String latlang = c1.getString(1).replaceAll("[{}]", "").trim();
-            String[] latlng = latlang.split("=");
-
-            LatLng position = new LatLng(Double.parseDouble(latlng[0]), Double.parseDouble(latlng[1]));
-            list.add(position);
-        }
-
-        Log.e("list returned", list.toString());
-        return list;
-    }
-
-
 
 }

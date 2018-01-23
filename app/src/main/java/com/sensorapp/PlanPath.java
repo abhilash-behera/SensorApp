@@ -78,7 +78,7 @@ public class PlanPath extends AppCompatActivity implements OnMapReadyCallback,Go
     FloatingActionButton ivTrack,ivFab;
     DatabaseHelper databaseHelper;
     ArrayList<String> list;
-    DebugHelper debugHelper;
+    /*DebugHelper debugHelper;*/
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -154,7 +154,7 @@ public class PlanPath extends AppCompatActivity implements OnMapReadyCallback,Go
         source=getIntent().getStringExtra("source");
         destination=getIntent().getStringExtra("destination");
 
-        debugHelper=new DebugHelper(this);
+        /*debugHelper=new DebugHelper(this);*/
 
         //creating geocoder object..
         Geocoder gc=new Geocoder(this);
@@ -392,7 +392,7 @@ public class PlanPath extends AppCompatActivity implements OnMapReadyCallback,Go
     @Override
     public void onCameraMove() {
         zoom = Math.round(5.0);
-        debugHelper.drawDebugGrid(mMap,zoom);
+        /*debugHelper.drawDebugGrid(mMap,zoom);*/
 
     }
 

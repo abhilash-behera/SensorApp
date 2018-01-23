@@ -16,4 +16,8 @@
 <item 
     android:id="@+id/mapTypeHybrid"
     android:title="@string/Hybrid"/>
+
+    <item
+        android:id="@+id/clear_map"
+        android:title="Clear Map"/>
 </menu>

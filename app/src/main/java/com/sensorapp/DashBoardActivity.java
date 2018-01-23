@@ -23,8 +23,14 @@ import es.dmoral.toasty.Toasty;
 
 public class DashBoardActivity extends AppCompatActivity implements View.OnClickListener {
 
-    CardView cardView1, cardView2, cardView3;
-    CoordinatorLayout coordinatorLayout;
+    private CardView cardView1, cardView2, cardView3;
+    private CoordinatorLayout coordinatorLayout;
+    public static final String DATA_TYPE="data_type";
+    public static final String DATA_TYPE_NOISE="data_type_noise";
+    public static final String DATA_TYPE_WIFI="data_type_wifi";
+    public static final String DATA_TYPE_MOBILE_DATA="data_type_mobile_data";
+    public static final String DATA_TYPE_GPS="data_type_gps";
+
 
     public static final int PERMISSION_CODE = 100;
     String permission[] = new String[]{android.Manifest.permission.RECORD_AUDIO,
@@ -176,7 +182,7 @@ public class DashBoardActivity extends AppCompatActivity implements View.OnClick
                     if (selectedText.equals("Noise")) {
                         //redirect to noise recording ....
                         intent = new Intent(getApplicationContext(), PlanPathActivity.class);
-                        intent.putExtra("Noise", "Noise");
+                        intent.putExtra(DATA_TYPE, DATA_TYPE_NOISE);
                         if(Utils.isNetworkAvailable(DashBoardActivity.this)){
                             startActivity(intent);
                         }else{
@@ -186,7 +192,7 @@ public class DashBoardActivity extends AppCompatActivity implements View.OnClick
                     else if (selectedText.equals("Wi-Fi Signal")) {
                         //redirect to wifi signal ....
                         intent = new Intent(getApplicationContext(), PlanPathActivity.class);
-                        intent.putExtra("Wifi", "Wi-Fi Signal");
+                        intent.putExtra(DATA_TYPE,DATA_TYPE_WIFI);
                         if(Utils.isNetworkAvailable(DashBoardActivity.this)){
                             startActivity(intent);
                         }else{
@@ -196,7 +202,7 @@ public class DashBoardActivity extends AppCompatActivity implements View.OnClick
                     else if (selectedText.equals("Mobile Data")) {
                         //redirect to mobile data ....
                         intent = new Intent(getApplicationContext(), PlanPathActivity.class);
-                        intent.putExtra("Mobile Data", "Mobile Data");
+                        intent.putExtra(DATA_TYPE, DATA_TYPE_MOBILE_DATA);
                         if(Utils.isNetworkAvailable(DashBoardActivity.this)){
                             startActivity(intent);
                         }else{
@@ -207,7 +213,7 @@ public class DashBoardActivity extends AppCompatActivity implements View.OnClick
                     else if (selectedText.equals("GPS")) {
                         //redirect to gps ....
                         intent = new Intent(getApplicationContext(), PlanPathActivity.class);
-                        intent.putExtra("GPS", "GPS");
+                        intent.putExtra(DATA_TYPE,DATA_TYPE_GPS);
                         if(Utils.isNetworkAvailable(DashBoardActivity.this)){
                             startActivity(intent);
                         }else{

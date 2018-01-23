@@ -13,6 +13,8 @@ import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
+import android.os.Handler;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -87,7 +89,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private double sourcelang;
     private Place place;
     private GPSTracker gpsTracker;
-    private DebugHelper debugHelper;
     private LinearLayout ll2;
     private Geocoder geocoder;
     private int markerCounter = 0;
@@ -107,6 +108,13 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private ProgressDialog progressDialog;
     private LatLng source;
     private LatLng destination;
+    private final int START_PLACE_REQUEST_CODE=2;
+    private final int DESTINATION_PLACE_REQUEST_CODE=3;
+    private Polyline aPolyline;
+    private Polyline dfsPolyline;
+    private Polyline routePolyline;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,12 +127,11 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private void checkConnection(){
         if (Utils.isNetworkAvailable(PlanPathActivity.this)) {
             if (googleServiceAvailable()) {
-                debugHelper = new DebugHelper(this);
                 DatabaseHelper databaseHelper=new DatabaseHelper(PlanPathActivity.this);
                 dataPoints=new ArrayList<>();
                 measurements=new ArrayList<>();
                 //checking which sensor are you click if wifi then execute..
-                if ("Wi-Fi Signal".equals(getIntent().getStringExtra("Wifi"))) {
+                if (getIntent().getStringExtra(DashBoardActivity.DATA_TYPE).equalsIgnoreCase(DashBoardActivity.DATA_TYPE_WIFI)) {
                     getSupportActionBar().setSubtitle("Wifi Measurements");
                     type="wifi";
 
@@ -139,7 +146,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 }
 
                 //if mobile data select..
-                else if ("Mobile Data".equals(getIntent().getStringExtra("Mobile Data"))) {
+                else if (getIntent().getStringExtra(DashBoardActivity.DATA_TYPE).equalsIgnoreCase(DashBoardActivity.DATA_TYPE_MOBILE_DATA)) {
                     getSupportActionBar().setSubtitle("Mobile Data measurements");
                     type="mobileData";
                     ArrayList<MobileData> mobileData=databaseHelper.getMobileData();
@@ -169,7 +176,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
 
                 //if noise selected..do nothing
-                else if ("Noise".equals(getIntent().getStringExtra("Noise"))) {
+                else if (getIntent().getStringExtra(DashBoardActivity.DATA_TYPE).equalsIgnoreCase(DashBoardActivity.DATA_TYPE_NOISE)) {
                     getSupportActionBar().setSubtitle("Noise measurements");
                     type="noise";
                     ArrayList<NoiseData> noiseData=databaseHelper.getNoiseData();
@@ -235,43 +242,76 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
         txtSource.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(final View v) {
+
                 final CharSequence[] options = {"Your Location", "Choose On Map"};
 
                 AlertDialog.Builder builder = new AlertDialog.Builder(PlanPathActivity.this);
                 builder.setItems(options, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int item) {
+                        if(markerSource!=null){
+                            markerSource.remove();
+                        }
                         if (options[item].equals("Your Location")) {
-
                             //get instance of gps tracker..
                             gpsTracker = new GPSTracker(PlanPathActivity.this);
                             if (!gpsTracker.canGetLocation()) {
                                 //if gps is off open dilog and redirect to setting..
                                 gpsTracker.showSettingsAlert();
-
                             } else {
                                 try {
-                                    sourcelat = gpsTracker.getLatitude();    //get latitude from gps..
-                                    sourcelang = gpsTracker.getLongitude();  //get longitude from gps
 
-                                    String source = getCompleteAddressString(sourcelat, sourcelang);
-                                    txtSource.setText(source);
+                                    source = new LatLng(gpsTracker.getLatitude(), gpsTracker.getLongitude());
+                                    Log.d("awesome","Source : "+source+" and destination: "+destination);
+                                    if(source!=null&&checkSameLocations(source,destination)){
+                                        Toasty.warning(PlanPathActivity.this,"Source and destination cannot be same.").show();
+                                        return;
+                                    }
+                                    Geocoder gc = new Geocoder(PlanPathActivity.this);
+                                    List<Address> list = null;
+                                    list = gc.getFromLocation(source.latitude, source.longitude, 1);
+                                    Log.d("awesome", "got click location : " + list.toString());
+                                    String state = "";
+                                    String city = "";
 
-                                    Log.e("awesome", source);
+                                    if (list != null) {
+                                        city = list.get(0).getSubLocality();
+                                        if (city == null) {
+                                            city = list.get(0).getLocality();
+                                            if (city == null) {
+                                                city = list.get(0).getSubAdminArea();
+                                                state = list.get(0).getAdminArea();
+                                            } else {
+                                                state = list.get(0).getSubAdminArea();
+                                            }
+                                        } else {
+                                            state = list.get(0).getLocality();
+                                        }
 
+                                        Log.d("awesome", "state: " + state + " and city: " + city);
 
-                                } catch (Exception ex) {
-
-                                    ex.printStackTrace();
+                                        MarkerOptions markerOptions = new MarkerOptions()
+                                                .title(state)
+                                                .position(source)
+                                                .snippet(city)
+                                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+                                        markerSource =mMap.addMarker(markerOptions);
+                                        markerCounter=1;
+                                        source=markerOptions.getPosition();
+                                        markerSource.showInfoWindow();
+                                        String source=(state==null?"":state)+","+(city==null?"":city);
+                                        Log.d("awesome","Source: "+source);
+                                        txtSource.setText(source);
+                                        gotoLocation(markerSource.getPosition().latitude,markerSource.getPosition().longitude);
+                                    } else {
+                                        Toasty.error(PlanPathActivity.this, "Unable to get your location.").show();
+                                    }
+                                } catch (Exception e) {
+                                    Log.d("awesome", "Exception in getting location :" + e.toString());
                                 }
-
-
                             }
-
-
                         } else if (options[item].equals("Choose On Map")) {
                             findStartPlace(v);
-
                         }
                     }
                 });
@@ -281,8 +321,79 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
         txtDestination.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) {
-                findDestinationPlace(v);
+            public void onClick(final View v) {
+                final CharSequence[] options = {"Your Location", "Choose On Map"};
+
+                AlertDialog.Builder builder = new AlertDialog.Builder(PlanPathActivity.this);
+                builder.setItems(options, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int item) {
+                        if(markerDestination!=null){
+                            markerDestination.remove();
+                        }
+                        if (options[item].equals("Your Location")) {
+                            //get instance of gps tracker..
+                            gpsTracker = new GPSTracker(PlanPathActivity.this);
+                            if (!gpsTracker.canGetLocation()) {
+                                //if gps is off open dilog and redirect to setting..
+                                gpsTracker.showSettingsAlert();
+                            } else {
+                                try {
+                                    destination = new LatLng(gpsTracker.getLatitude(), gpsTracker.getLongitude());
+                                    Log.d("awesome","Source: "+source+" and destination: "+destination);
+                                    if(destination!=null&&checkSameLocations(source,destination)){
+                                        Toasty.warning(PlanPathActivity.this,"Source and destination cannot be same.").show();
+                                        return;
+                                    }
+                                    Geocoder gc = new Geocoder(PlanPathActivity.this);
+                                    List<Address> list = null;
+                                    list = gc.getFromLocation(destination.latitude, destination.longitude, 1);
+                                    Log.d("awesome", "got click location : " + list.toString());
+                                    String state = "";
+                                    String city = "";
+
+                                    if (list != null) {
+                                        city = list.get(0).getSubLocality();
+                                        if (city == null) {
+                                            city = list.get(0).getLocality();
+                                            if (city == null) {
+                                                city = list.get(0).getSubAdminArea();
+                                                state = list.get(0).getAdminArea();
+                                            } else {
+                                                state = list.get(0).getSubAdminArea();
+                                            }
+                                        } else {
+                                            state = list.get(0).getLocality();
+                                        }
+
+                                        Log.d("awesome", "state: " + state + " and city: " + city);
+
+                                        MarkerOptions markerOptions = new MarkerOptions()
+                                                .title(state)
+                                                .position(destination)
+                                                .snippet(city)
+                                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                                        markerDestination =mMap.addMarker(markerOptions);
+                                        markerCounter=0;
+                                        markerDestination.showInfoWindow();
+                                        String destination=(state==null?"":state)+","+(city==null?"":city);
+                                        Log.d("awesome","Destination: "+destination);
+                                        txtDestination.setText(destination);
+                                        gotoLocation(markerDestination.getPosition().latitude,markerDestination.getPosition().longitude);
+                                    } else {
+                                        Toasty.error(PlanPathActivity.this, "Unable to get your location.").show();
+                                    }
+                                } catch (Exception e) {
+                                    Log.d("awesome", "Exception in getting location :" + e.toString());
+                                }
+                            }
+                        } else if (options[item].equals("Choose On Map")) {
+                            findDestinationPlace(v);
+                        }
+                    }
+                });
+                builder.show();
+                //findDestinationPlace(v);
             }
         });
 
@@ -294,6 +405,13 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 }else if(markerDestination==null){
                     Toasty.warning(PlanPathActivity.this,"Please select destination").show();
                 }else{
+                    if(checkSameLocations(source,destination)){
+                        Toasty.error(PlanPathActivity.this,"Source and destination cannot be same.").show();
+                        return;
+                    }
+                    MapGrid mapGrid=new MapGrid(mMap);
+                    mapGrid.drawGrid(markerSource.getPosition(),markerDestination.getPosition(),0.00125762);
+                    mapGrid.getStartNode();
                     progressDialog=new ProgressDialog(PlanPathActivity.this);
                     progressDialog.setCancelable(false);
                     progressDialog.setTitle("Finding Optimal Path");
@@ -302,6 +420,20 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     progressDialog.setIndeterminate(false);
                     progressDialog.show();
 
+                    if(dfsPolyline!=null){
+                        dfsPolyline.remove();
+                        dfsPolyline=null;
+                    }
+
+                    if(aPolyline!=null){
+                        aPolyline.remove();
+                        aPolyline=null;
+                    }
+
+                    if(routePolyline!=null){
+                        routePolyline.remove();
+                        routePolyline=null;
+                    }
 
                     new AsyncTask<Void,Integer,Integer>(){
                         int progress=0;
@@ -335,12 +467,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                 Log.d("awesome","Nodelist node: "+node);
                             }
 
-
                             ArrayList<Node> openList=new ArrayList<>();
                             ArrayList<Node> closeList=new ArrayList<>();
-
-
-
 
                             openList.add(sourceNode);
                             //openList.add(destinationNode);
@@ -414,6 +542,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                             }
 
                             closeList.add(destinationNode);
+
+                            final PolylineOptions polylineOptions=new PolylineOptions().color(Color.BLUE).width(6);
                             for(int i=0;i<closeList.size()-1;i++){
                                 Node s=closeList.get(i);
                                 Node d=closeList.get(i+1);
@@ -427,7 +557,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
                                 try{
                                     DirectionApiResponse directionApiResponse=pathCall.execute().body();
-                                    final PolylineOptions polylineOptions=new PolylineOptions().color(Color.BLUE).width(6);
                                     polylineOptions.add(s.getLatLng());
                                     List<Step> steps=directionApiResponse.getRoutes().get(0).getLegs().get(0).getSteps();
                                     for(Step step:steps){
@@ -439,13 +568,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
                                     polylineOptions.add(d.getLatLng());
 
-                                    runOnUiThread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            mMap.addPolyline(polylineOptions);
-                                        }
-                                    });
-
                                     if(progress<90){
                                         progress+=5;
                                         publishProgress(progress);
@@ -455,6 +577,14 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                     return 0;
                                 }
                             }
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    aPolyline=mMap.addPolyline(polylineOptions);
+                                    Log.d("awesome","aPolyline size: "+aPolyline.getPoints().size());
+                                }
+                            });
 
                             return 1;
                         }
@@ -489,7 +619,131 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 }else if(markerDestination==null){
                     Toasty.warning(PlanPathActivity.this,"Please select destination").show();
                 }else{
+                    if(checkSameLocations(source,destination)){
+                        Toasty.error(PlanPathActivity.this,"Source and destination cannot be same.").show();
+                        return;
+                    }
+                    progressDialog=new ProgressDialog(PlanPathActivity.this);
+                    progressDialog.setCancelable(false);
+                    progressDialog.setTitle("Finding Optimal Path");
+                    progressDialog.setMessage("Applying DFS algorithm. Please wait...");
+                    progressDialog.show();
 
+                    if(aPolyline!=null){
+                        aPolyline.remove();
+                        aPolyline=null;
+                    }
+
+                    if(dfsPolyline!=null){
+                        dfsPolyline.remove();
+                        dfsPolyline=null;
+                    }
+
+                    if(routePolyline!=null){
+                        routePolyline.remove();
+                        routePolyline=null;
+                    }
+
+                    new AsyncTask<Void,Integer,Integer>(){
+                        @Override
+                        protected void onPreExecute() {
+                            super.onPreExecute();
+                        }
+
+                        @Override
+                        protected Integer doInBackground(Void... voids) {
+                            Node sourceNode=new Node();
+                            sourceNode.setLatLng(new LatLng(source.latitude,source.longitude));
+                            Log.d("awesome","Source node: "+sourceNode.toString());
+
+                            Node destinationNode=new Node();
+                            destinationNode.setLatLng(new LatLng(destination.latitude,destination.longitude));
+                            Log.d("awesome","Destination node: "+destinationNode.toString());
+
+                            ArrayList<Node> nodeList=new ArrayList();
+                            for(LatLng latLng:dataPoints){
+                                Node node=new Node();
+                                node.setLatLng(latLng);
+                                nodeList.add(node);
+                                Log.d("awesome","nodeList node: "+node);
+
+                                sourceNode.adjacencyList.add(node);
+                            }
+
+                            for(Node node:nodeList){
+                                for(Node adjacentNode:nodeList){
+                                    if(adjacentNode!=node){
+                                        node.adjacencyList.add(adjacentNode);
+                                    }
+                                }
+                                node.adjacencyList.add(destinationNode);
+                            }
+
+                            algoDFS(sourceNode,destinationNode);
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    progressDialog.setTitle("Drawing Route");
+                                    progressDialog.setMessage("please wait...");
+                                }
+                            });
+
+                            final PolylineOptions polylineOptions=new PolylineOptions();
+                            polylineOptions.color(Color.GREEN).width(5);
+                            Node n=sourceNode;
+                            while (n.getChild()!=null){
+                                try{
+                                    Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinates(
+                                            n.getLatLng().latitude+","+n.getLatLng().longitude,
+                                            n.getChild().getLatLng().latitude+","+n.getChild().getLatLng().longitude,
+                                            Utils.API_KEY
+                                    );
+
+                                    DirectionApiResponse directionApiResponse=call.execute().body();
+                                    polylineOptions.add(n.getLatLng());
+                                    List<Step> steps=directionApiResponse.getRoutes().get(0).getLegs().get(0).getSteps();
+                                    for(Step step:steps){
+                                        List<LatLng> points=decodePoly(step.getPolyline().getPoints());
+                                        for(LatLng latLng:points){
+                                            polylineOptions.add(latLng);
+                                        }
+                                    }
+
+                                    polylineOptions.add(n.getChild().getLatLng());
+                                }catch (Exception e){
+                                    Log.d("awesome","Exception in drawing optimal path: "+e.toString());
+                                    return 0;
+                                }
+                                Log.d("awesome","printing: "+n.toString());
+                                n=n.getChild();
+                            }
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    dfsPolyline=mMap.addPolyline(polylineOptions);
+                                }
+                            });
+                            return 1;
+                        }
+
+                        @Override
+                        protected void onProgressUpdate(Integer... values) {
+                            super.onProgressUpdate(values);
+                        }
+
+                        @Override
+                        protected void onPostExecute(Integer integer) {
+                            super.onPostExecute(integer);
+                            progressDialog.dismiss();
+                            if(integer==0){
+                                Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                            }else{
+                                Toasty.success(PlanPathActivity.this,"Optimal route found successfully.").show();
+                            }
+                        }
+                    }.execute();
                 }
             }
         });
@@ -502,6 +756,10 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 } else if (markerDestination==null) {
                     Toasty.warning(PlanPathActivity.this,"Please select destination").show();
                 } else{
+                    if(checkSameLocations(source,destination)){
+                        Toasty.error(PlanPathActivity.this,"Source and destination cannot be same.").show();
+                        return;
+                    }
                     /*String directionApiPath = Utils.getUrl(String.valueOf(markerSource.getPosition().latitude), String.valueOf(markerSource.getPosition().longitude),
                             String.valueOf(markerDestination.getPosition().latitude), String.valueOf(markerDestination.getPosition().longitude));
                     Log.d("awesome", "Direction api url: " + directionApiPath);*/
@@ -511,6 +769,21 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         progressDialog.setTitle("Getting route");
                         progressDialog.setMessage("please wait...");
                         progressDialog.show();
+
+                        if(aPolyline!=null){
+                            aPolyline.remove();
+                            aPolyline=null;
+                        }
+
+                        if(dfsPolyline!=null){
+                            dfsPolyline.remove();
+                            dfsPolyline=null;
+                        }
+
+                        if(routePolyline!=null){
+                            routePolyline.remove();
+                            routePolyline=null;
+                        }
 
                         ApiInterface service= ApiClient.getClient();
                         Call<DirectionApiResponse> call=service.getPathCoordinates(
@@ -534,7 +807,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                         }
                                     }
                                     polylineOptions.add(new LatLng(markerDestination.getPosition().latitude,markerDestination.getPosition().longitude));
-                                    Polyline polyline=mMap.addPolyline(polylineOptions.width(5).color(Color.RED));
+                                    routePolyline=mMap.addPolyline(polylineOptions.width(5).color(Color.RED));
                                     progressDialog.dismiss();
                                 }else{
                                     progressDialog.dismiss();
@@ -558,9 +831,178 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
         fabFav.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if(!txtSource.getText().toString().isEmpty()&&!txtDestination.getText().toString().isEmpty()){
+
+                    DatabaseHelper databaseHelper=new DatabaseHelper(PlanPathActivity.this);
+
+                    //Converting datapoints into string
+                    String dataPointsString="";
+                    List<LatLng> dataPointsList=PlanPathActivity.this.dataPoints;
+                    for(int i=0;i<dataPointsList.size();i++){
+                        if(i!=dataPointsList.size()-1){
+                            String point=dataPointsList.get(i).latitude+"-"+dataPointsList.get(i).longitude+",";
+                            dataPointsString+=point;
+                        }else{
+                            String point=dataPointsList.get(i).latitude+"-"+dataPointsList.get(i).longitude;
+                            dataPointsString+=point;
+                        }
+                    }
+
+                    //Converting measurements into string
+                    String measurementsString="";
+                    List<Double> measurementsList=PlanPathActivity.this.measurements;
+                    for(int i=0;i<measurementsList.size();i++){
+                        if(i!=measurementsList.size()-1){
+                            String point=measurementsList.get(i)+",";
+                            measurementsString+=point;
+                        }else{
+                            String point=measurementsList.get(i)+"";
+                            measurementsString+=point;
+                        }
+                    }
+
+                    if(aPolyline!=null){
+
+                        //Converting polypoints into string
+                        String polyPointsString="";
+                        List<LatLng> points=aPolyline.getPoints();
+                        for(int i=0;i<points.size();i++){
+                            if(i!=points.size()-1){
+                                String point=points.get(i).latitude+"-"+points.get(i).longitude+",";
+                                polyPointsString+=point;
+                            }else{
+                                String point=points.get(i).latitude+"-"+points.get(i).longitude;
+                                polyPointsString+=point;
+                            }
+                        }
+
+                        FavouriteData favouriteData=new FavouriteData(
+                                txtSource.getText().toString(),
+                                txtDestination.getText().toString(),
+                                "A*",
+                                polyPointsString,
+                                dataPointsString,
+                                measurementsString,
+                                getIntent().getStringExtra(DashBoardActivity.DATA_TYPE)
+                        );
+
+                        if(databaseHelper.insertFavouriteData(favouriteData)){
+                            Toasty.success(PlanPathActivity.this,"Favourite data inserted successfully.",Toast.LENGTH_LONG).show();
+                        }else{
+                            Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                        }
+                    }else if(dfsPolyline!=null){
+                        //Converting polypoints into string
+                        String polyPointsString="";
+                        List<LatLng> points=dfsPolyline.getPoints();
+                        for(int i=0;i<points.size();i++){
+                            if(i!=points.size()-1){
+                                String point=points.get(i).latitude+"-"+points.get(i).longitude+",";
+                                polyPointsString+=point;
+                            }else{
+                                String point=points.get(i).latitude+"-"+points.get(i).longitude;
+                                polyPointsString+=point;
+                            }
+                        }
+
+                        FavouriteData favouriteData=new FavouriteData(
+                                txtSource.getText().toString(),
+                                txtDestination.getText().toString(),
+                                "DFS",
+                                polyPointsString,
+                                dataPointsString,
+                                measurementsString,
+                                getIntent().getStringExtra(DashBoardActivity.DATA_TYPE)
+                        );
+
+                        if(databaseHelper.insertFavouriteData(favouriteData)){
+                            Toasty.success(PlanPathActivity.this,"Favourite data inserted successfully.",Toast.LENGTH_LONG).show();
+                        }else{
+                            Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                        }
+
+                    }else if(routePolyline!=null){
+                        //Converting polypoints into string
+                        String polyPointsString="";
+                        List<LatLng> points=routePolyline.getPoints();
+                        for(int i=0;i<points.size();i++){
+                            if(i!=points.size()-1){
+                                String point=points.get(i).latitude+"-"+points.get(i).longitude+",";
+                                polyPointsString+=point;
+                            }else{
+                                String point=points.get(i).latitude+"-"+points.get(i).longitude;
+                                polyPointsString+=point;
+                            }
+                        }
+
+                        FavouriteData favouriteData=new FavouriteData(
+                                txtSource.getText().toString(),
+                                txtDestination.getText().toString(),
+                                "None",
+                                polyPointsString,
+                                dataPointsString,
+                                measurementsString,
+                                getIntent().getStringExtra(DashBoardActivity.DATA_TYPE)
+                        );
+
+                        if(databaseHelper.insertFavouriteData(favouriteData)){
+                            Toasty.success(PlanPathActivity.this,"Favourite data inserted successfully.",Toast.LENGTH_LONG).show();
+                        }else{
+                            Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
+                        }
+                    }else{
+                        Toasty.warning(PlanPathActivity.this,"Please generate a route first.").show();
+                    }
+                }else{
+                    Toasty.warning(PlanPathActivity.this,"Please select source and destination.").show();
+                }
 
             }
         });
+    }
+
+    private boolean checkSameLocations(LatLng source, LatLng destination) {
+        if(source==null||destination==null){
+            return false;
+        }
+        if(source.latitude==destination.latitude&&source.longitude==destination.longitude){
+            return true;
+        }
+        return false;
+    }
+
+    private int algoDFS(Node node,Node destinationNode) {
+        node.setVisited(true);
+        if(node==destinationNode){
+            return 0;
+        }else{
+
+            int minimumDistance=0;
+            Node minimumNode=null;
+            for(Node adjacentNode:node.getAdjacencyList()){
+                if(adjacentNode.isVisited()){
+                    continue;
+                }
+                try{
+                    Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinates(
+                            node.getLatLng().latitude+","+node.getLatLng().longitude,
+                            adjacentNode.getLatLng().latitude+","+adjacentNode.getLatLng().longitude,
+                            Utils.API_KEY
+                    );
+
+                    DirectionApiResponse directionApiResponse=call.execute().body();
+                    int totalDistance=algoDFS(adjacentNode,destinationNode)+directionApiResponse.getRoutes().get(0).getLegs().get(0).getDistance().getValue();
+                    if(totalDistance<minimumDistance||minimumDistance==0){
+                        minimumDistance=totalDistance;
+                        minimumNode=adjacentNode;
+                    }
+                }catch (Exception e){
+                    Log.d("awesome","Exception in finding distance: "+e.toString());
+                }
+            }
+            node.setChild(minimumNode);
+            return minimumDistance;
+        }
     }
 
     private boolean betterNodeExists(ArrayList<Node> nodeArrayList, Node n) {
@@ -571,7 +1013,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 }
             }
         }
-
         return false;
     }
 
@@ -826,7 +1267,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
                         markerDestination =mMap.addMarker(markerOptions);
                         markerDestination.showInfoWindow();
-                        destination=markerDestination.getPosition();
+                        destination=markerOptions.getPosition();
                         markerCounter++;
                         String destination=(state==null?"":state)+","+(city==null?"":city);
                         Log.d("awesome","Destination: "+destination);
@@ -993,6 +1434,10 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
                 break;
 
+            case R.id.clear_map:
+                clearMap();
+                break;
+
             default:
                 break;
         }
@@ -1000,6 +1445,33 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             finish();
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void clearMap() {
+        if(aPolyline!=null){
+            aPolyline.remove();
+            aPolyline=null;
+        }
+
+        if(dfsPolyline!=null){
+            dfsPolyline.remove();
+            dfsPolyline=null;
+        }
+
+        if(markerSource!=null){
+            markerSource.remove();
+            markerSource=null;
+        }
+
+        if(markerDestination!=null){
+            markerDestination.remove();
+            markerDestination=null;
+        }
+
+        if(routePolyline!=null){
+            routePolyline.remove();
+            routePolyline=null;
+        }
     }
 
 
@@ -1016,13 +1488,12 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     strReturnedAddress.append(returnedAddress.getAddressLine(i)).append("\n");
                 }
                 strAdd = strReturnedAddress.toString();
-                Log.e("My Current loction", "" + strReturnedAddress.toString());
+                Log.d("awesome", "" + strReturnedAddress.toString());
             } else {
-                Log.e("My Current loction ", "No Address returned!");
+                Log.d("awesome", "No Address returned!");
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            Log.e("My Current loction", "Canont get Address!");
+            Log.d("awesome", "Canont get Address!");
         }
         return strAdd;
     }
@@ -1033,7 +1504,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             Intent intent = new PlaceAutocomplete
                     .IntentBuilder(PlaceAutocomplete.MODE_OVERLAY)
                     .build(this);
-            startActivityForResult(intent, 1);
+            startActivityForResult(intent, START_PLACE_REQUEST_CODE);
         } catch (GooglePlayServicesRepairableException e) {
             Toasty.error(PlanPathActivity.this,"Please update google play services first",Toast.LENGTH_LONG).show();
             Log.d("awesome","Exception in finding start place: "+e.toString());
@@ -1049,7 +1520,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             Intent intent = new PlaceAutocomplete
                     .IntentBuilder(PlaceAutocomplete.MODE_OVERLAY)
                     .build(this);
-            startActivityForResult(intent, 2);
+            startActivityForResult(intent, DESTINATION_PLACE_REQUEST_CODE);
         } catch (GooglePlayServicesRepairableException e) {
             Log.d("awesome","Exception in choosing destination: "+e.toString());
         } catch (GooglePlayServicesNotAvailableException e) {
@@ -1077,26 +1548,69 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 Log.d("awesome","Result cancelled");
             }
         }
-        if (requestCode == 2) {
+        if (requestCode == START_PLACE_REQUEST_CODE) {
             Log.d("awesome","result code: "+resultCode);
             if (resultCode == RESULT_OK) {
                 // retrive the data by using getPlace() method.
                 place = PlaceAutocomplete.getPlace(this, data);
-
-                txtDestination.setText(place.getAddress());
-                location = String.valueOf(place.getLatLng());
-
+                source=place.getLatLng();
+                if(checkSameLocations(source,destination)){
+                    Toasty.warning(PlanPathActivity.this,"Source and destination cannot be same").show();
+                    return;
+                }
+                txtSource.setText(place.getAddress());
+                if(markerSource!=null){
+                    markerSource.remove();
+                }
+                MarkerOptions markerOptions = new MarkerOptions()
+                        .title(String.valueOf(place.getAddress()))
+                        .position(source)
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+                markerSource =mMap.addMarker(markerOptions);
+                markerSource.showInfoWindow();
+                gotoLocation(source.latitude,source.longitude);
             } else if (resultCode == PlaceAutocomplete.RESULT_ERROR) {
-                //Status status = PlaceAutocomplete.getStatus(this, data);
-                Log.d("awesome","Result error");
+                Log.d("awesome","Result error:"+data);
+                Toasty.error(PlanPathActivity.this,"Error in getting location. Try again.").show();
             } else if (resultCode == RESULT_CANCELED) {
                 // The user canceled the operation.
-                Log.d("awesome","Result cancelled");
+                Log.d("awesome","Start place request cancelled");
             }else{
                 Log.d("awesome","Result code: "+resultCode);
+                Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.").show();
             }
 
-//            Log.e("location",place.getAddress().toString());
+        }else if(requestCode==DESTINATION_PLACE_REQUEST_CODE){
+            Log.d("awesome","result code: "+resultCode);
+            if (resultCode == RESULT_OK) {
+                // retrive the data by using getPlace() method.
+                place = PlaceAutocomplete.getPlace(this, data);
+                destination=place.getLatLng();
+                if(checkSameLocations(source,destination)){
+                    Toasty.warning(PlanPathActivity.this,"Source and destination cannot be same").show();
+                    return;
+                }
+                txtDestination.setText(place.getAddress());
+                if(markerDestination!=null){
+                    markerDestination.remove();
+                }
+                MarkerOptions markerOptions = new MarkerOptions()
+                        .title(String.valueOf(place.getAddress()))
+                        .position(destination)
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                markerDestination =mMap.addMarker(markerOptions);
+                markerDestination.showInfoWindow();
+                gotoLocation(destination.latitude,destination.longitude);
+            } else if (resultCode == PlaceAutocomplete.RESULT_ERROR) {
+                Log.d("awesome","Result error:"+data);
+                Toasty.error(PlanPathActivity.this,"Error in getting location. Try again.").show();
+            } else if (resultCode == RESULT_CANCELED) {
+                // The user canceled the operation.
+                Log.d("awesome","Destination place request cancelled");
+            }else{
+                Log.d("awesome","Result code: "+resultCode);
+                Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.").show();
+            }
         }
 
     }
@@ -1104,7 +1618,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     @Override
     public void onCameraMove() {
         Log.d("Camera zoom", "Zoom " + mMap.getCameraPosition().zoom);
-        debugHelper.drawDebugGrid(mMap, 3.5f);
     }
 
     private double deg2rad(double degrees){
@@ -1114,6 +1627,4 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private double rad2deg(double radians){
         return 180.0*radians/Math.PI;
     }
-
-
 }

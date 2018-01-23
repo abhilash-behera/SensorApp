@@ -1,23 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/coordinatorLayout"
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:background="#F0F0F0"
     android:layout_height="match_parent">
-
-    <LinearLayout
+    <android.support.v7.widget.RecyclerView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
-
-        <android.support.v7.widget.RecyclerView
-            android:id="@+id/recyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            >
-
-        </android.support.v7.widget.RecyclerView>
-
-    </LinearLayout>
-
-</android.support.design.widget.CoordinatorLayout>
+        android:layout_height="match_parent"
+        android:id="@+id/recyclerView"/>
+</RelativeLayout>

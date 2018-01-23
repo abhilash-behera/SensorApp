@@ -95,7 +95,7 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
     Marker mCurrentLocationMarker;
     TextView tvDistance, noise, avgNoise;
     DatabaseHelper databaseHelper;
-    ArrayList<FavouritesList> favouritesList;
+    ArrayList<FavouriteData> favouritesList;
     CoordinatorLayout coordinatorLayout;
     ArrayList<String> list;
     DebugHelper debugHelper;
@@ -186,8 +186,8 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
     private void continueExecution(){
         //initilizing
         MarkerPoints = new ArrayList<>();
-        favouritesList = new ArrayList<FavouritesList>();
-        debugHelper = new DebugHelper(this);
+        favouritesList = new ArrayList<FavouriteData>();
+        /*debugHelper = new DebugHelper(this);*/
         databaseHelper = new DatabaseHelper(this);
         list = new ArrayList<String>();
         //list = databaseHelper.getAudioDb();
@@ -249,33 +249,9 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
         mMap.setOnCameraMoveListener(this);
 
         debugHelper.drawDebugGrid(mMap, 3.5f);
+     //}
 
-        if ("A".equals(intent.getStringExtra("id"))) {
-            ALGORITHM = "A";
-            favouritesList = databaseHelper.getAllFabList();
-            Log.e("List", favouritesList.toString());
-            for (int i = 0; i < favouritesList.size(); i++) {
-                String sId = favouritesList.get(i).getSource();
-                String dId = favouritesList.get(i).getDestination();
-                Log.e("S,D", "" + sId + "," + dId);
-                // geoLocate(sId, dId);
-            }
-            lineIndex = 0;
-        }
-        if ("DFS".equals(intent.getStringExtra("id"))) {
-            ALGORITHM = "DFS";
-            favouritesList = databaseHelper.getAllFabList();
-            Log.e("List", favouritesList.toString());
-            for (int i = 0; i < favouritesList.size(); i++) {
-                String sId = favouritesList.get(i).getSource();
-                String dId = favouritesList.get(i).getDestination();
-                Log.e("S,D", "" + sId + "," + dId);
-                // geoLocate(sId, dId);
-            }
-            lineIndex = 1;
-        }
-
-        geoLocate(source, destination);
+        /*geoLocate(source, destination);
         //Initialize Google Play Services
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -287,7 +263,7 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
             buildGoogleApiClient();
             mMap.setMyLocationEnabled(true);
             mMap.getUiSettings().setCompassEnabled(true);
-        }
+        }*/
     }
 
     protected synchronized void buildGoogleApiClient() {

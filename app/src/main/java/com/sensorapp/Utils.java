@@ -12,7 +12,7 @@ import java.util.HashMap;
 
 public class Utils {
     private static final String DIRECTION_API = "https://maps.googleapis.com/maps/api/directions/json?origin=";
-    public static final String API_KEY = "AIzaSyAVGOnVbI3caSMRCIKtDnhVficWwdl0DI8";
+    public static final String API_KEY = "AIzaSyCHHu5Z1fHWkxbY06GaSH2Tfa2P5CPB2-g";
 
     public static String getUrl(String originLat, String originLon, String destinationLat, String destinationLon){
         return DIRECTION_API + originLat+","+originLon+"&destination="+destinationLat+","+destinationLon+"&key="+API_KEY;

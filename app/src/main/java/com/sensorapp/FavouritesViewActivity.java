@@ -153,7 +153,7 @@ public class FavouritesViewActivity extends AppCompatActivity implements OnMapRe
         MarkerPoints = new ArrayList<>();
 
         databaseHelper = new DatabaseHelper(this);
-        debugHelper = new DebugHelper(this);
+        debugHelper = new DebugHelper();
 
         noise.setText(avgNoise + " db");
 
