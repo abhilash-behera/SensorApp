@@ -133,7 +133,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         while (c.moveToNext()){
             NoiseData data=new NoiseData(c.getString(1),c.getString(2),c.getString(3),c.getString(4));
             list.add(data);
-            Log.d("awesome","Noise data: {audioPath:"+data.getAudioPath()+",avgDb:"+data.getAvgDb()+",latitude:"+data.getLatitude()+",longitude:"+data.getLongitude()+"}");
         }
         return list;
     }

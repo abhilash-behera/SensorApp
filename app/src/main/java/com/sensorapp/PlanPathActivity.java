@@ -50,14 +50,18 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.maps.model.VisibleRegion;
+import com.google.maps.android.PolyUtil;
 import com.sensorapp.retrofit.ApiClient;
 import com.sensorapp.retrofit.ApiInterface;
 import com.sensorapp.retrofit.DirectionApiResponse;
@@ -93,8 +97,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private Geocoder geocoder;
     private int markerCounter = 0;
     private GeoLocate geoLocate;
-    private ArrayList<LatLng> dataPoints;
-    private ArrayList<Double> measurements;
+    private ArrayList<DataPoint> dataPoints;
+    private ArrayList<GridNode> gridList;
     private String type="";
     private Marker markerSource;
     private Marker markerDestination;
@@ -113,6 +117,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private Polyline aPolyline;
     private Polyline dfsPolyline;
     private Polyline routePolyline;
+    private static final Double CLUSTER_SIZE=0.00125762;
+    private MapGrid mapGrid;
 
 
 
@@ -129,7 +135,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             if (googleServiceAvailable()) {
                 DatabaseHelper databaseHelper=new DatabaseHelper(PlanPathActivity.this);
                 dataPoints=new ArrayList<>();
-                measurements=new ArrayList<>();
+
                 //checking which sensor are you click if wifi then execute..
                 if (getIntent().getStringExtra(DashBoardActivity.DATA_TYPE).equalsIgnoreCase(DashBoardActivity.DATA_TYPE_WIFI)) {
                     getSupportActionBar().setSubtitle("Wifi Measurements");
@@ -139,8 +145,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
                     for(WifiData wifiDatum:wifiData){
                         LatLng latLng=new LatLng(Double.valueOf(wifiDatum.getLatitude()),Double.valueOf(wifiDatum.getLongitude()));
-                        dataPoints.add(latLng);
-                        measurements.add(Double.valueOf(wifiDatum.getSpeed()));
+                        dataPoints.add(new DataPoint(latLng,Double.valueOf(wifiDatum.getSpeed())));
                     }
                     Log.d("awesome","Got data points: "+dataPoints.size());
                 }
@@ -152,28 +157,11 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     ArrayList<MobileData> mobileData=databaseHelper.getMobileData();
                     for(MobileData mobileDatum:mobileData){
                         LatLng latLng=new LatLng(Double.valueOf(mobileDatum.getLatitude()),Double.valueOf(mobileDatum.getLongitude()));
-                        dataPoints.add(latLng);
-                        measurements.add(Double.valueOf(mobileDatum.getSpeed()));
+                        dataPoints.add(new DataPoint(latLng,Double.valueOf(mobileDatum.getSpeed())));
                     }
 
                     Log.d("awesome","Got data points: "+dataPoints.size());
                 }
-
-
-                //if gps selected..
-                /*else if ("GPS".equals(getIntent().getStringExtra("GPS"))) {
-                    getSupportActionBar().setSubtitle("GPS measurements");
-                    type="gps";
-                    ArrayList<GPSData> gpsData=databaseHelper.getGpsData();
-                    for(GPSData gpsDatum:gpsData){
-                        LatLng latLng=new LatLng(Double.valueOf(gpsDatum.getLatitude()),Double.valueOf(gpsDatum.getLongitude()));
-                        dataPoints.add(latLng);
-
-                    }
-
-                    Log.d("awesome","Got data points: "+dataPoints.size());
-                }*/
-
 
                 //if noise selected..do nothing
                 else if (getIntent().getStringExtra(DashBoardActivity.DATA_TYPE).equalsIgnoreCase(DashBoardActivity.DATA_TYPE_NOISE)) {
@@ -182,13 +170,12 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     ArrayList<NoiseData> noiseData=databaseHelper.getNoiseData();
                     for(NoiseData noiseDatum:noiseData){
                         LatLng latLng=new LatLng(Double.valueOf(noiseDatum.getLatitude()),Double.valueOf(noiseDatum.getLongitude()));
-                        dataPoints.add(latLng);
-                        measurements.add(Double.valueOf(noiseDatum.getAvgDb()));
+                        dataPoints.add(new DataPoint(latLng,Double.valueOf(noiseDatum.getAvgDb())));
                     }
                     Log.d("awesome","Got data points: "+dataPoints.size());
                 }
 
-                if(measurements.size()==0){
+                if(dataPoints.size()==0){
                     Toasty.info(PlanPathActivity.this,"No measurements found.",Toast.LENGTH_LONG).show();
                     finish();
                 }else{
@@ -409,9 +396,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         Toasty.error(PlanPathActivity.this,"Source and destination cannot be same.").show();
                         return;
                     }
-                    MapGrid mapGrid=new MapGrid(mMap);
-                    mapGrid.drawGrid(markerSource.getPosition(),markerDestination.getPosition(),0.00125762);
-                    mapGrid.getStartNode();
+
                     progressDialog=new ProgressDialog(PlanPathActivity.this);
                     progressDialog.setCancelable(false);
                     progressDialog.setTitle("Finding Optimal Path");
@@ -440,151 +425,21 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         @Override
                         protected void onPreExecute() {
                             super.onPreExecute();
+                            for(int i=0;i<gridList.size();i++){
+                                List<LatLng> points=gridList.get(i).getPolygon().getPoints();
+                                LatLngBounds latLngBounds=new LatLngBounds(points.get(0),points.get(2));
+                                if(latLngBounds.contains(markerSource.getPosition())){
+                                    gridList.get(i).getPolygon().setFillColor(0xff00ff00);
+                                    markerSource.remove();
+                                }else if(latLngBounds.contains(markerDestination.getPosition())){
+                                    gridList.get(i).getPolygon().setFillColor(0xffff0000);
+                                    markerDestination.remove();
+                                }
+                            }
                         }
 
                         @Override
                         protected Integer doInBackground(Void... voids) {
-                            ArrayList<Node> nodeList=new ArrayList<>();
-
-                            Node sourceNode=new Node();
-                            sourceNode.setLatLng(source);
-                            sourceNode.setF(0);
-                            sourceNode.setG(0);
-
-                            Node destinationNode=new Node();
-                            destinationNode.setLatLng(destination);
-                            destinationNode.setF(Integer.MAX_VALUE);
-
-                            nodeList.add(sourceNode);
-                            for(LatLng latLng:dataPoints){
-                                Node node=new Node();
-                                node.setLatLng(latLng);
-                                nodeList.add(node);
-                            }
-                            nodeList.add(destinationNode);
-
-                            for(Node node:nodeList){
-                                Log.d("awesome","Nodelist node: "+node);
-                            }
-
-                            ArrayList<Node> openList=new ArrayList<>();
-                            ArrayList<Node> closeList=new ArrayList<>();
-
-                            openList.add(sourceNode);
-                            //openList.add(destinationNode);
-
-                            progress+=5;
-                            publishProgress(5);
-
-
-                            while(openList.size()!=0){
-                                Log.d("awesome","open list size: "+openList.size());
-                                if(progress<90){
-                                    progress+=5;
-                                    publishProgress(progress);
-                                }
-                                Node n=getNodeWithMinFValue(openList);
-                                Log.d("awesome","Node with minimum f value: "+n);
-                                Log.d("awesome","Adding node: "+n+" to close list: "+closeList.add(n));
-                                Log.d("awesome","Removing node: "+n+" from open list: "+openList.remove(n));
-
-                                for(Node successor:nodeList){
-                                    if(successor!=sourceNode&&successor!=destinationNode&&successor!=n&&!listContainsNode(closeList,successor)){
-                                        successor.setParent(n);
-
-                                        Call<DirectionApiResponse> gCall=ApiClient.getClient().getPathCoordinates(
-                                                n.getLatLng().latitude+","+n.getLatLng().longitude,
-                                                successor.getLatLng().latitude+","+successor.getLatLng().longitude,
-                                                Utils.API_KEY
-                                        );
-
-                                        try{
-                                            DirectionApiResponse gResponse=gCall.execute().body();
-                                            successor.setG(n.getG()+gResponse.getRoutes().get(0).getLegs().get(0).getDistance().getValue());
-                                            Log.d("awesome","Setting new G value: "+successor.getG()+" to node: "+successor);
-                                            if(progress<90){
-                                                progress+=2;
-                                                publishProgress(progress);
-                                            }
-                                        }catch (Exception e){
-                                            Log.d("awesome","Exception in setting new G value: "+e.toString());
-                                            return 0;
-                                        }
-
-                                        Call<DirectionApiResponse> hCall=ApiClient.getClient().getPathCoordinates(
-                                                successor.getLatLng().latitude+","+successor.getLatLng().longitude,
-                                                destination.latitude+","+destination.longitude,
-                                                Utils.API_KEY
-                                        );
-
-                                        try{
-                                            DirectionApiResponse hResponse=hCall.execute().body();
-                                            successor.setH(hResponse.getRoutes().get(0).getLegs().get(0).getDistance().getValue());
-                                            Log.d("awesome","Setting new H value: "+successor.getH()+" to node: "+successor);
-                                            if(progress<90){
-                                                progress+=2;
-                                                publishProgress(progress);
-                                            }
-                                        }catch (Exception e){
-                                            Log.d("awesome","Exception in setting new H value: "+e.toString());
-                                            return 0;
-                                        }
-
-                                        successor.setF(successor.getG()+successor.getH());
-
-                                        if(!listContainsNode(openList,successor)){
-                                            openList.add(successor);
-                                        }
-
-                                    }
-                                }
-
-                            }
-
-                            closeList.add(destinationNode);
-
-                            final PolylineOptions polylineOptions=new PolylineOptions().color(Color.BLUE).width(6);
-                            for(int i=0;i<closeList.size()-1;i++){
-                                Node s=closeList.get(i);
-                                Node d=closeList.get(i+1);
-                                Log.d("awesome","Drawing paths from node-"+s+" to node-"+d);
-
-                                Call<DirectionApiResponse> pathCall=ApiClient.getClient().getPathCoordinates(
-                                        s.getLatLng().latitude+","+s.getLatLng().longitude,
-                                        d.getLatLng().latitude+","+d.getLatLng().longitude,
-                                        Utils.API_KEY
-                                );
-
-                                try{
-                                    DirectionApiResponse directionApiResponse=pathCall.execute().body();
-                                    polylineOptions.add(s.getLatLng());
-                                    List<Step> steps=directionApiResponse.getRoutes().get(0).getLegs().get(0).getSteps();
-                                    for(Step step:steps){
-                                        List<LatLng> decodedPoints=decodePoly(step.getPolyline().getPoints());
-                                        for(LatLng latLng:decodedPoints){
-                                            polylineOptions.add(latLng);
-                                        }
-                                    }
-
-                                    polylineOptions.add(d.getLatLng());
-
-                                    if(progress<90){
-                                        progress+=5;
-                                        publishProgress(progress);
-                                    }
-                                }catch(Exception e){
-                                    Log.d("awesome","Exception in drawing path: "+e.toString());
-                                    return 0;
-                                }
-                            }
-
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    aPolyline=mMap.addPolyline(polylineOptions);
-                                    Log.d("awesome","aPolyline size: "+aPolyline.getPoints().size());
-                                }
-                            });
 
                             return 1;
                         }
@@ -661,7 +516,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                             Log.d("awesome","Destination node: "+destinationNode.toString());
 
                             ArrayList<Node> nodeList=new ArrayList();
-                            for(LatLng latLng:dataPoints){
+                            for(int i=0;i<dataPoints.size();i++){
+                                LatLng latLng=dataPoints.get(i).getPosition();
                                 Node node=new Node();
                                 node.setLatLng(latLng);
                                 nodeList.add(node);
@@ -837,26 +693,26 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
                     //Converting datapoints into string
                     String dataPointsString="";
-                    List<LatLng> dataPointsList=PlanPathActivity.this.dataPoints;
-                    for(int i=0;i<dataPointsList.size();i++){
-                        if(i!=dataPointsList.size()-1){
-                            String point=dataPointsList.get(i).latitude+"-"+dataPointsList.get(i).longitude+",";
+
+                    for(int i=0;i<dataPoints.size();i++){
+                        if(i!=dataPoints.size()-1){
+                            String point=dataPoints.get(i).getPosition().latitude+"-"+dataPoints.get(i).getPosition().longitude+",";
                             dataPointsString+=point;
                         }else{
-                            String point=dataPointsList.get(i).latitude+"-"+dataPointsList.get(i).longitude;
+                            String point=dataPoints.get(i).getPosition().latitude+"-"+dataPoints.get(i).getPosition().longitude;
                             dataPointsString+=point;
                         }
                     }
 
                     //Converting measurements into string
                     String measurementsString="";
-                    List<Double> measurementsList=PlanPathActivity.this.measurements;
-                    for(int i=0;i<measurementsList.size();i++){
-                        if(i!=measurementsList.size()-1){
-                            String point=measurementsList.get(i)+",";
+
+                    for(int i=0;i<dataPoints.size();i++){
+                        if(i!=dataPoints.size()-1){
+                            String point=dataPoints.get(i).getMeasurement()+",";
                             measurementsString+=point;
                         }else{
-                            String point=measurementsList.get(i)+"";
+                            String point=dataPoints.get(i).getMeasurement()+"";
                             measurementsString+=point;
                         }
                     }
@@ -1128,45 +984,23 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             mMap.getUiSettings().setCompassEnabled(true);
         }
 
+        geoLocate = new GeoLocate(mMap, PlanPathActivity.this, mGoogleApiClient);
+        GPSTracker gpsTracker=new GPSTracker(PlanPathActivity.this);
+        Location location=gpsTracker.getLocation();
+        gotoLocation(location.getLatitude(),location.getLongitude());
+        mapGrid=new MapGrid(mMap);
 
-        //The following variables are used when wifi plan path is selected
-        Double minWifiSpeed=0.0;
-        Double maxWifiSpeed=0.0;
-
-        Double minDataSpeed=0.0;
-        Double maxDataSpeed=0.0;
-
-        if(type.equalsIgnoreCase("wifi")){
-            minWifiSpeed=measurements.get(0);
-            maxWifiSpeed=measurements.get(0);
-            for(Double measurement:measurements){
-                Log.d("awesome","measurement: "+measurement);
-                if(minWifiSpeed>measurement){
-                    minWifiSpeed=measurement;
-                }
-
-                if(maxWifiSpeed<measurement){
-                    maxWifiSpeed=measurement;
-                }
+        Handler handler=new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                drawGrid(mMap);
             }
-
-            Log.d("awesome","Got minWifiSpeed= "+minWifiSpeed+" and maxWifiSpeed= "+maxWifiSpeed);
-        }else if(type.equalsIgnoreCase("mobileData")){
-            minDataSpeed=measurements.get(0);
-            maxDataSpeed=measurements.get(0);
-            for(Double measurement:measurements){
-                if(minDataSpeed>measurement){
-                    minDataSpeed=measurement;
-                }
-
-                if(maxDataSpeed<measurement){
-                    maxDataSpeed=measurement;
-                }
-            }
-        }
+        },3000);
 
 
-        for(LatLng point:dataPoints){
+
+        /*for(LatLng point:dataPoints){
             double maxLatitude=point.latitude+0.00062881;
             double minLatitude=point.latitude-0.00062881;
             double lngBuffer=0.07*(350/(Math.cos(deg2rad(point.latitude))*40075));
@@ -1182,8 +1016,9 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     new LatLng(minLatitude,maxLongitude)
             ));
 
+            String alpha="00";
             if(type.equalsIgnoreCase("noise")){
-                String alpha=Utils.getAlphaValue((int)Math.round(measurements.get(dataPoints.indexOf(point))));
+                alpha=Utils.getAlphaValue((int)Math.round(measurements.get(dataPoints.indexOf(point))));
                 Log.d("awesome","Got alpha value: "+alpha);
                 polygon.setFillColor(Utils.hex2Decimal(alpha+"FF0000"));
                 polygon.setStrokeColor(Utils.hex2Decimal("00000000"));
@@ -1196,7 +1031,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 int percentage=(int)Math.round((x-minWifiSpeed)*100/(maxWifiSpeed-minWifiSpeed));
                 Log.d("awesome","percentage: "+percentage);
 
-                String alpha=Utils.getAlphaValue(percentage);
+                alpha=Utils.getAlphaValue(percentage);
                 Log.d("awesome","alpha: "+alpha);
                 polygon.setFillColor(Utils.hex2Decimal(alpha+"00FF00"));
                 polygon.setStrokeColor(Utils.hex2Decimal("00000000"));
@@ -1209,14 +1044,16 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                 int percentage=(int)Math.round((x-minDataSpeed)*100/(maxDataSpeed-minDataSpeed));
                 Log.d("awesome","Percentage: "+percentage);
 
-                String alpha=Utils.getAlphaValue(percentage);
+                alpha=Utils.getAlphaValue(percentage);
                 Log.d("awesome","alpha: "+alpha);
                 polygon.setFillColor(Utils.hex2Decimal(alpha+"0000FF"));
                 polygon.setStrokeColor(Utils.hex2Decimal("00000000"));
             }
-        }
 
-        geoLocate = new GeoLocate(mMap, PlanPathActivity.this, mGoogleApiClient);
+            DataPoint dataPoint=new DataPoint(point,alpha);
+            dataPointsList.add(dataPoint);
+        }*/
+
 
         mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
             @Override
@@ -1291,6 +1128,57 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
             }
         });
+
+    }
+
+    private void drawGrid(GoogleMap mMap) {LatLng center=mMap.getProjection().getVisibleRegion().latLngBounds.getCenter();
+        LatLng start=mMap.getProjection().getVisibleRegion().latLngBounds.southwest;
+        LatLng destination=mMap.getProjection().getVisibleRegion().latLngBounds.northeast;
+        Log.d("awesome","center: "+center);
+        Log.d("awesome","start: "+start);
+        Log.d("awesome","destination: "+destination);
+        mapGrid.drawGrid(start,destination,CLUSTER_SIZE);
+        gridList=mapGrid.getGridList();
+
+        Double minValue;
+        Double maxValue;
+
+        minValue=dataPoints.get(0).getMeasurement();
+        maxValue=dataPoints.get(0).getMeasurement();
+
+        for(int i=0;i<dataPoints.size();i++){
+            Double measurement=dataPoints.get(i).getMeasurement();
+            if(minValue>measurement){
+                minValue=measurement;
+            }
+
+            if(maxValue<measurement){
+                maxValue=measurement;
+            }
+        }
+
+        Log.d("awesome","Got minValue: "+minValue+" and maxValue: "+maxValue);
+
+        for(int i=0;i<dataPoints.size();i++){
+            Double x=dataPoints.get(i).getMeasurement();
+            int percentage=(int)Math.round((x-minValue)*100/(maxValue-minValue));
+            Log.d("awesome","percentage: "+percentage);
+            if(percentage==0){
+                percentage+=10;
+            }
+            String alpha=Utils.getAlphaValue(percentage);
+            dataPoints.get(i).setAlpha(alpha);
+
+            for(int j=0;j<gridList.size();j++){
+                List<LatLng> points=gridList.get(j).getPolygon().getPoints();
+                LatLngBounds latLngBounds=new LatLngBounds(points.get(0),points.get(2));
+                if(latLngBounds.contains(dataPoints.get(i).getPosition())){
+                    gridList.get(j).getPolygon().setFillColor(Utils.hex2Decimal(alpha+"0000FF"));
+                    gridList.get(j).setType(GridNode.TYPE_OBSTACLE);
+                    break;
+                }
+            }
+        }
     }
 
     private List<LatLng> decodePoly(String encoded) {

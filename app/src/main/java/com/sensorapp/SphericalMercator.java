@@ -21,6 +21,7 @@ public final class SphericalMercator {
     private static final double MAX_LATITUDE = 85.0511287798;
 
     private SphericalMercator() {
+
     }
 
     public static double fromLatitude(double latitude) {
