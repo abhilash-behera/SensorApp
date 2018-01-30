@@ -11,34 +11,33 @@ import java.util.List;
  */
 
 public class GridNode {
-    private ArrayList<GridNode> children=new ArrayList<>();
-    private Polygon polygon;
-    private String type="node";
     public static final String TYPE_OBSTACLE="obstacle";
     public static final String TYPE_NODE="node";
+    public static final String TYPE_SOURCE="source";
+    public static final String TYPE_DESTINATION="destination";
 
-    public String getType() {
-        return type;
-    }
 
-    public void setType(String type) {
-        this.type = type;
-    }
+    public Polygon polygon;
+    public String type;
+    public Double f=0.0d;
+    public Double g=0.0d;
+    public Double h=0.0d;
+    public int a=-1;
+    public int b=-1;
+    public GridNode parent;
 
-    public ArrayList<GridNode> getChildren() {
-        return children;
-    }
+    public LatLng getLocation(){
+        Double avgLatitude=0.0d;
+        Double avgLongitude=0.0d;
 
-    public void setChildren(ArrayList<GridNode> children) {
-        this.children = children;
-    }
+        for(int i=0;i<polygon.getPoints().size()-1;i++){
+            avgLatitude+=polygon.getPoints().get(i).latitude;
+            avgLongitude+=polygon.getPoints().get(i).longitude;
+        }
+        avgLatitude=avgLatitude/4;
+        avgLongitude=avgLongitude/4;
 
-    public Polygon getPolygon() {
-        return polygon;
-    }
-
-    public void setPolygon(Polygon polygon) {
-        this.polygon = polygon;
+        return new LatLng(avgLatitude,avgLongitude);
     }
 
 }

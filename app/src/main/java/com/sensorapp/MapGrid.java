@@ -15,7 +15,7 @@ import java.util.ArrayList;
 
 public class MapGrid {
     private ArrayList<Polygon> polygonList =new ArrayList<>();
-    private ArrayList<GridNode> gridList;
+    private ArrayList<ArrayList<GridNode>> gridList;
     private GoogleMap map;
 
     public MapGrid(GoogleMap map){
@@ -42,6 +42,7 @@ public class MapGrid {
 
         for(int i=0;i<step;i++){
             Double y=minY;
+            ArrayList<GridNode> verticalList=new ArrayList<>();
             for(int j=0;j<step;j++){
                 PolygonOptions polygonOptions=new PolygonOptions();
                 polygonOptions.add(new LatLng(minX,y))
@@ -53,24 +54,26 @@ public class MapGrid {
                 Polygon polygon=map.addPolygon(polygonOptions);
 
                 GridNode gridNode=new GridNode();
-                gridNode.setPolygon(polygon);
+                gridNode.polygon=polygon;
                 polygonList.add(polygon);
-                gridList.add(gridNode);
+                verticalList.add(gridNode);
                 y+=clusterSize;
             }
+            gridList.add(verticalList);
             minX+=clusterSize;
         }
     }
 
     public GridNode getStartNode(){
-        for(int i=0;i<gridList.size();i++){
+        /*for(int i=0;i<gridList.size();i++){
             getChildren(gridList.get(i));
         }
 
-        return gridList.get(0);
+        return gridList.get(0);*/
+        return gridList.get(0).get(0);
     }
 
-    public void getChildren(GridNode gridNode){
+    /*public void getChildren(GridNode gridNode){
         for(int i=0;i<gridList.size();i++){
             if(gridList.get(i)==gridNode){
                 Log.d("awesome","Oops its me");
@@ -85,9 +88,9 @@ public class MapGrid {
             }
         }
         Log.d("awesome","Total children of "+gridNode+" : "+gridNode.getChildren().size());
-    }
+    }*/
 
-    public ArrayList<GridNode> getGridList(){
+    public ArrayList<ArrayList<GridNode>> getGridList(){
         return this.gridList;
     }
 
