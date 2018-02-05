@@ -7,11 +7,14 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.maps.model.LatLng;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import es.dmoral.toasty.Toasty;
 
 
 public class DatabaseHelper extends SQLiteOpenHelper {
@@ -51,9 +54,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String KEY_DATAPOINTS="KEY_DATAPOINTS";
     private static final String KEY_MEASUREMENTS="KEY_MEASUREMENTS";
     private static final String KEY_TYPE="KEY_TYPE";
+    private Context context;
 
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, 1);
+        this.context=context;
     }
 
     //Create table here
@@ -208,7 +213,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String sql="SELECT * FROM "+TABLE_FAVOURITE+" WHERE id=?";
 
         Cursor c=db.rawQuery(sql,new String[]{String.valueOf(id)});
-        if(c.getCount()>0){
+        if(c.moveToFirst()){
             c.moveToFirst();
             FavouriteData favouriteData=new FavouriteData(
                     c.getString(1),
@@ -219,8 +224,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     c.getString(6),
                     c.getString(7)
             );
+
             return favouriteData;
         }else{
+            Toasty.error(context,"Unable to get route with id: "+id, Toast.LENGTH_LONG).show();
             return null;
         }
     }

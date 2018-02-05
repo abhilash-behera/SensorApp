@@ -14,7 +14,6 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.FloatingActionButton;
@@ -101,7 +100,7 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
     DebugHelper debugHelper;
     LatLngBounds.Builder builder;
     LatLngBounds initialBounds = null;
-    TextView tvDfs, tvA;
+    TextView tvBfs, tvA;
     String id;
     int i = 1;
     Intent intent;
@@ -124,7 +123,7 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
 // Create a stroke pattern of a gap followed by a dot.
     private final List<PatternItem> PATTERN_POLYLINE_DOTTED = Arrays.asList(GAP, DOT);
     private ArrayList<String> positionsList = null;
-    String ALGORITHM = "DFS";
+    String ALGORITHM = "BFS";
 
 
     @Override
@@ -214,14 +213,14 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
         tvDistance = (TextView) findViewById(R.id.tvDistance);
         avgNoise = (TextView) findViewById(R.id.AvgNoise);
         noise = (TextView) findViewById(R.id.tvAvgNoise);
-        tvDfs = (TextView) findViewById(R.id.tvDfs);
+        tvBfs = (TextView) findViewById(R.id.tvBfs);
         tvA = (TextView) findViewById(R.id.tvA);
 
         ivTrack = (FloatingActionButton) findViewById(R.id.ivTrack);
         ivFab = (FloatingActionButton) findViewById(R.id.ivFab);
         ivTrack.setOnClickListener(this);
         ivFab.setOnClickListener(this);
-        tvDfs.setOnClickListener(this);
+        tvBfs.setOnClickListener(this);
         tvA.setOnClickListener(this);
     }
 
@@ -820,8 +819,8 @@ public class PlanPathViewActivity extends AppCompatActivity implements OnMapRead
             //  }
         }
 
-        if (view == tvDfs) {
-            ALGORITHM = "DFS";
+        if (view == tvBfs) {
+            ALGORITHM = "BFS";
 
             //   favouritesList = databaseHelper.getAllFabList();
             //   Log.e("List", favouritesList.toString());

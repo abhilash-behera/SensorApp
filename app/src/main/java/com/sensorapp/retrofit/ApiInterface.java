@@ -12,5 +12,16 @@ import retrofit2.http.Query;
 public interface ApiInterface {
     @Headers("Content-type:application/json")
     @GET("/maps/api/directions/json")
-    Call<DirectionApiResponse> getPathCoordinates(@Query("origin") String origin,@Query("destination") String destination,@Query("key") String key);
+    Call<DirectionApiResponse> getPathCoordinates(
+            @Query("origin") String origin,
+            @Query("destination") String destination,
+            @Query("key") String key);
+
+    @Headers("Content-type:application/json")
+    @GET("/maps/api/directions/json")
+    Call<DirectionApiResponse> getPathCoordinatesWithWaypoints(
+            @Query("origin") String origin,
+            @Query("destination") String destination,
+            @Query("waypoints") String waypoints,
+            @Query("key") String key);
 }

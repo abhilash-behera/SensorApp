@@ -13,7 +13,6 @@ import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.Handler;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -50,35 +49,30 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.Polygon;
-import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
-import com.google.android.gms.maps.model.VisibleRegion;
-import com.google.maps.android.PolyUtil;
 import com.sensorapp.retrofit.ApiClient;
 import com.sensorapp.retrofit.ApiInterface;
 import com.sensorapp.retrofit.DirectionApiResponse;
 import com.sensorapp.retrofit.Step;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Queue;
 
 import es.dmoral.toasty.Toasty;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-
-@SuppressWarnings("ALL")
+@SuppressWarnings("all")
 public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
         LocationListener, GoogleMap.OnCameraMoveListener {
@@ -107,7 +101,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private TextView txtSource;
     private TextView txtDestination;
     private Button btnA;
-    private Button btnDfs;
+    private Button btnBfs;
     private FloatingActionButton fabTrack;
     private FloatingActionButton fabFav;
     private ProgressDialog progressDialog;
@@ -116,7 +110,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private final int START_PLACE_REQUEST_CODE=2;
     private final int DESTINATION_PLACE_REQUEST_CODE=3;
     private Polyline aPolyline;
-    private Polyline dfsPolyline;
+    private Polyline bfsPolyline;
     private Polyline routePolyline;
     private static final Double CLUSTER_SIZE=0.00125762;
     private MapGrid mapGrid;
@@ -124,6 +118,8 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
     private int destination_y;
     private int start_x;
     private int start_y;
+    private Polyline virtualA;
+    private Polyline virtualBfs;
 
 
 
@@ -227,7 +223,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
         txtSource=(TextView)findViewById(R.id.txtSource);
         txtDestination=(TextView)findViewById(R.id.txtDestination);
         btnA=(Button)findViewById(R.id.btnA);
-        btnDfs=(Button)findViewById(R.id.btnDfs);
+        btnBfs =(Button)findViewById(R.id.btnBfs);
         fabTrack=(FloatingActionButton)findViewById(R.id.fabTrack);
         fabFav=(FloatingActionButton)findViewById(R.id.fabFav);
 
@@ -410,26 +406,21 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     progressDialog.setIndeterminate(false);
                     progressDialog.show();
 
-                    if(dfsPolyline!=null){
-                        dfsPolyline.remove();
-                        dfsPolyline=null;
-                    }
-
-                    if(aPolyline!=null){
-                        aPolyline.remove();
-                        aPolyline=null;
-                    }
-
-                    if(routePolyline!=null){
-                        routePolyline.remove();
-                        routePolyline=null;
-                    }
-
                     new AsyncTask<Void,Integer,Integer>(){
                         int progress=0;
                         @Override
                         protected void onPreExecute() {
                             super.onPreExecute();
+
+                            if(bfsPolyline!=null){
+                                bfsPolyline.remove();
+                                bfsPolyline=null;
+                            }
+
+                            mMap.clear();
+
+                            drawGrid(mMap);
+
                             for(int a=0;a<gridList.size();a++){
                                 for(int b=0;b<gridList.get(a).size();b++){
                                     List<LatLng> points=gridList.get(a).get(b).polygon.getPoints();
@@ -454,14 +445,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
                         @Override
                         protected Integer doInBackground(Void... voids) {
-                            Log.d("awesome","Coordinates of destination ("+destination_x+","+destination_y+")");
-                            for(int i=0;i<gridList.size();i++){
-                                for(int j=0;j<gridList.size();j++){
-                                    if(gridList.get(i).get(j).type==GridNode.TYPE_OBSTACLE){
-                                        Log.d("awesome","Obstacle at "+i+","+j);
-                                    }
-                                }
-                            }
                             for(int x=0;x<gridList.size();x++){
                                 for(int y=0;y<gridList.get(x).size();y++){
                                     GridNode gridNode=gridList.get(x).get(y);
@@ -477,8 +460,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                 }
                             }
 
-                            final ArrayList<TraceNode> traceNodes=new ArrayList<>();
-
                             //Initialize closed list
                             ArrayList<GridNode> closedList=new ArrayList<>();
 
@@ -487,9 +468,12 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
                             //Put starting node in open list
                             final GridNode startNode=gridList.get(start_x).get(start_y);
+                            startNode.f=0.0d;
+                            startNode.g=0.0d;
                             openList.add(startNode);
 
                             while (openList.size()!=0){
+
                                 //check for node with minimum f value in openlist
                                 final GridNode q=getNodeWithMinFValue(openList);
 
@@ -497,103 +481,113 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                                 Boolean removeResult=openList.remove(q);
                                 Log.d("awesome","Popping q: "+q+" status: "+removeResult);
 
-                                //Add q to closed list
-
-
                                 runOnUiThread(new Runnable() {
                                     @Override
                                     public void run() {
-                                        if(!(q.a==start_x&&q.b==start_y)){
-                                            q.polygon.setFillColor(0xffffff00);
+                                        if(!(q.a==start_x&&q.b==start_y)&&!(q.a==destination_x&&q.b==destination_y)&&!(q.type==GridNode.TYPE_OBSTACLE)){
+                                            q.polygon.setFillColor(0x55ffff00);
                                         }
 
                                     }
                                 });
 
+                                try{
+                                    Thread.sleep(50);
+                                }catch (Exception ignored){}
+
+                                if(q.a==destination_x&&q.b==destination_y){
+                                    Log.d("awesome","Reached destination node");
+                                    //trace path
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            publishProgress(100);
+
+                                            //Normal line
+                                            PolylineOptions normalLine=new PolylineOptions();
+                                            normalLine.width(5.0f);
+                                            normalLine.color(0xffff7b00);
+
+                                            ArrayList<GridNode> traceList=new ArrayList<>();
+                                            drawAPath(q,normalLine,traceList);
+                                        }
+                                    });
+
+                                    //stop search
+                                    return 1;
+                                }
+
                                 //For each successor node of q
-                                ArrayList<GridNode> successorList=getSuccessors(q,q.a,q.b);
+                                ArrayList<GridNode> successorList=getSuccessors(q);
+
                                 for(final GridNode successor:successorList){
-                                    if(successor.a==destination_x&&successor.b==destination_y){
+
+                                    //If successor is the destination
+                                    /*if(successor.a==destination_x&&successor.b==destination_y){
                                         Log.d("awesome","Reached destination node");
-                                        TraceNode traceNode=new TraceNode();
-                                        traceNode.setNode(successor);
-                                        traceNode.setParent(q);
-                                        traceNodes.add(traceNode);
                                         //trace path
                                         runOnUiThread(new Runnable() {
                                             @Override
                                             public void run() {
                                                 publishProgress(100);
-                                                //drawPath(gridList.get(destination_x).get(destination_y));
-                                                for(TraceNode traceNode:traceNodes){
-                                                    Log.d("awesome","Node: "+traceNode.node+" parent: "+traceNode.parent);
-                                                }
-                                                Log.d("awesome","-----------------------");
-                                                printNode(successor,traceNodes);
+                                                PolylineOptions polylineOptions=new PolylineOptions();
+                                                polylineOptions.width(5.0f);
+                                                polylineOptions.color(0xffff7b00);
+                                                successor.parent=q;
+                                                drawAPath(successor,polylineOptions);
                                             }
                                         });
 
                                         //stop search
                                         return 1;
-                                    }
+                                    }*/
 
-                                    Double newG=q.g+Math.sqrt(Double.valueOf(Math.pow(q.a-successor.a,2)+Math.pow(q.b-successor.b,2)));
+                                    Double newG=q.g+Math.sqrt(Math.pow(q.a-successor.a,2)+Math.pow(q.b-successor.b,2));
                                     Double newF=newG+successor.h;
-                                    Log.d("awesome","previous F: "+successor.f+" and new F: "+newF);
 
-                                    //Check openlist for already existing node
+
                                     if(openList.contains(successor)){
-                                        Log.d("awesome","openlist contains successor");
-                                        if(openList.get(openList.indexOf(successor)).f<newF){
-                                            Log.d("awesome","Openlist already contains this successor and its the best so skipping");
+                                        if(openList.get(openList.indexOf(successor)).g<newG){
+                                            Log.d("awesome","Openlist already contains the best version");
                                             continue;
                                         }
-                                        Log.d("awesome","Openlist already contains this successor but its not the best so continuing");
                                     }
 
-                                    //Check closedlist for already existing node
                                     if(closedList.contains(successor)){
-                                        Log.d("awesome","Closed list contains this successor");
-                                        if(closedList.get(closedList.indexOf(successor)).f<newF){
-                                            Log.d("awesome","Closedlist already contains this successor and its the best so skipping");
+                                        if(closedList.get(closedList.indexOf(successor)).g<newG){
+                                            Log.d("awesome","Closedlist already contains the best version");
                                             continue;
                                         }
-                                        Log.d("awesome","Closed list already contains this successor but its not the best");
                                     }
 
-                                    Log.d("awesome","Moving this node from closed list to open list");
-                                    successor.g=newG;
-                                    successor.f=newF;
-                                    openList.add(successor);
+                                    if(openList.contains(successor)){
+                                        int index=openList.indexOf(successor);
+                                        successor.g=newG;
+                                        successor.f=newF;
+                                        successor.parent=q;
+                                        openList.set(index,successor);
+                                    }else{
+                                        successor.g=newG;
+                                        successor.f=newF;
+                                        successor.parent=q;
+                                        openList.add(successor);
+                                    }
+                                    closedList.remove(successor);
                                     runOnUiThread(new Runnable() {
                                         @Override
                                         public void run() {
-                                            successor.polygon.setFillColor(0xffdddd00);
+                                            if(!(successor.a==start_x&&successor.b==start_y)&&!(successor.a==destination_x&&successor.b==destination_y)&&!(successor.type==GridNode.TYPE_OBSTACLE)){
+                                                successor.polygon.setFillColor(0x55b0db67);
+                                            }
+
                                         }
                                     });
-
-                                    /*//Removing from closed list and adding to openlist
-                                    if(closedList.contains(successor)){
-                                        removeResult=closedList.remove(successor);
-                                        Log.d("awesome","Removing status from closed list: "+removeResult);
-                                    }
-
-                                    if(openList.contains(successor)){
-                                        Log.d("awesome","Updating successor data in openlist");
-                                        openList.get(openList.indexOf(successor)).g=newG;
-                                        openList.get(openList.indexOf(successor)).f=newF;
-                                        openList.get(openList.indexOf(successor)).parent=q;
-                                    }else{
-                                        openList.add(successor);
-                                        Log.d("awesome","Adding successor to openlist");
-                                    }
-
-*/
+                                    try{
+                                        Thread.sleep(50);
+                                    }catch (Exception ignored){}
                                 }
-                                TraceNode traceNode=new TraceNode();
-                                traceNode.setNode(q);
-                                traceNode.setParent(q.parent);
-                                traceNodes.add(traceNode);
+
+                                //Add q to closed list
                                 closedList.add(q);
                             }
                             return 1;
@@ -625,7 +619,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
 
 
 
-        btnDfs.setOnClickListener(new View.OnClickListener() {
+        btnBfs.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(markerSource==null){
@@ -640,106 +634,122 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                     progressDialog=new ProgressDialog(PlanPathActivity.this);
                     progressDialog.setCancelable(false);
                     progressDialog.setTitle("Finding Optimal Path");
-                    progressDialog.setMessage("Applying DFS algorithm. Please wait...");
+                    progressDialog.setMessage("Applying BFS algorithm. Please wait...");
                     progressDialog.show();
-
-                    if(aPolyline!=null){
-                        aPolyline.remove();
-                        aPolyline=null;
-                    }
-
-                    if(dfsPolyline!=null){
-                        dfsPolyline.remove();
-                        dfsPolyline=null;
-                    }
-
-                    if(routePolyline!=null){
-                        routePolyline.remove();
-                        routePolyline=null;
-                    }
 
                     new AsyncTask<Void,Integer,Integer>(){
                         @Override
                         protected void onPreExecute() {
                             super.onPreExecute();
+
+                            if(aPolyline!=null){
+                                aPolyline.remove();
+                                aPolyline=null;
+                            }
+
+                            mMap.clear();
+
+                            drawGrid(mMap);
+
+                            for(int a=0;a<gridList.size();a++){
+                                for(int b=0;b<gridList.get(a).size();b++){
+                                    List<LatLng> points=gridList.get(a).get(b).polygon.getPoints();
+                                    LatLngBounds latLngBounds=new LatLngBounds(points.get(0),points.get(2));
+                                    GridNode gridNode=gridList.get(a).get(b);
+                                    if(latLngBounds.contains(markerSource.getPosition())){
+                                        gridNode.polygon.setFillColor(0xff00ff00);
+                                        gridNode.type=GridNode.TYPE_SOURCE;
+                                        markerSource.remove();
+                                        start_x=a;
+                                        start_y=b;
+                                        Log.d("awesome","Start coordinates: "+a+","+b);
+                                    }else if(latLngBounds.contains(markerDestination.getPosition())){
+                                        gridNode.polygon.setFillColor(0xffff0000);
+                                        gridNode.type=GridNode.TYPE_DESTINATION;
+                                        markerDestination.remove();
+                                        destination_x=a;
+                                        destination_y=b;
+                                        Log.d("awesome","Destination coordinates: "+a+","+b);
+                                    }
+                                }
+                            }
+
+                            for(int x=0;x<gridList.size();x++){
+                                for(int y=0;y<gridList.get(x).size();y++){
+                                    GridNode gridNode=gridList.get(x).get(y);
+                                    gridNode.a=x;
+                                    gridNode.b=y;
+                                    gridList.get(x).set(y,gridNode);
+                                }
+                            }
                         }
 
                         @Override
                         protected Integer doInBackground(Void... voids) {
-                            Node sourceNode=new Node();
-                            sourceNode.setLatLng(new LatLng(source.latitude,source.longitude));
-                            Log.d("awesome","Source node: "+sourceNode.toString());
 
-                            Node destinationNode=new Node();
-                            destinationNode.setLatLng(new LatLng(destination.latitude,destination.longitude));
-                            Log.d("awesome","Destination node: "+destinationNode.toString());
+                            Queue<GridNode> bfsQueue=new LinkedList<>();
 
-                            ArrayList<Node> nodeList=new ArrayList();
-                            for(int i=0;i<dataPoints.size();i++){
-                                LatLng latLng=dataPoints.get(i).getPosition();
-                                Node node=new Node();
-                                node.setLatLng(latLng);
-                                nodeList.add(node);
-                                Log.d("awesome","nodeList node: "+node);
 
-                                sourceNode.adjacencyList.add(node);
-                            }
+                            GridNode startNode=gridList.get(start_x).get(start_y);
+                            startNode.opened=true;
 
-                            for(Node node:nodeList){
-                                for(Node adjacentNode:nodeList){
-                                    if(adjacentNode!=node){
-                                        node.adjacencyList.add(adjacentNode);
-                                    }
+                            bfsQueue.offer(startNode);
+                            Log.d("awesome","Offered Start node: "+startNode);
+
+                            while(!bfsQueue.isEmpty()){
+
+                                final GridNode node=bfsQueue.poll();
+                                node.closed=true;
+                                if(node.a==destination_x&&node.b==destination_y){
+                                    Log.d("awesome","Reached destination "+node+" with parent: "+node.parent);
+                                    PolylineOptions polylineOptions=new PolylineOptions();
+                                    polylineOptions.width(5.0f).color(0xffffcc00);
+                                    ArrayList<GridNode> traceList=new ArrayList<>();
+                                    drawBfsPath(node,polylineOptions,traceList);
+                                    return 1;
                                 }
-                                node.adjacencyList.add(destinationNode);
-                            }
 
-                            algoDFS(sourceNode,destinationNode);
-
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    progressDialog.setTitle("Drawing Route");
-                                    progressDialog.setMessage("please wait...");
-                                }
-                            });
-
-                            final PolylineOptions polylineOptions=new PolylineOptions();
-                            polylineOptions.color(Color.GREEN).width(5);
-                            Node n=sourceNode;
-                            while (n.getChild()!=null){
-                                try{
-                                    Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinates(
-                                            n.getLatLng().latitude+","+n.getLatLng().longitude,
-                                            n.getChild().getLatLng().latitude+","+n.getChild().getLatLng().longitude,
-                                            Utils.API_KEY
-                                    );
-
-                                    DirectionApiResponse directionApiResponse=call.execute().body();
-                                    polylineOptions.add(n.getLatLng());
-                                    List<Step> steps=directionApiResponse.getRoutes().get(0).getLegs().get(0).getSteps();
-                                    for(Step step:steps){
-                                        List<LatLng> points=decodePoly(step.getPolyline().getPoints());
-                                        for(LatLng latLng:points){
-                                            polylineOptions.add(latLng);
+                                if(!(node.a==start_x&&node.b==start_y)&&!(node.a==destination_x&&node.b==destination_y)&&!(node.type==GridNode.TYPE_OBSTACLE)){
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            node.polygon.setFillColor(0xaaffffcc);
                                         }
-                                    }
-
-                                    polylineOptions.add(n.getChild().getLatLng());
-                                }catch (Exception e){
-                                    Log.d("awesome","Exception in drawing optimal path: "+e.toString());
-                                    return 0;
+                                    });
                                 }
-                                Log.d("awesome","printing: "+n.toString());
-                                n=n.getChild();
+
+                                try{
+                                    Thread.sleep(50);
+                                }catch (InterruptedException ignored){};
+
+
+                                ArrayList<GridNode> successors=getSuccessors(node);
+                                for(final GridNode successor:successors){
+                                    if(successor.closed||successor.opened){
+                                        Log.d("awesome","Node skipped");
+                                        continue;
+                                    }
+                                    successor.opened=true;
+                                    successor.parent=node;
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            if(!(successor.a==start_x&&successor.b==start_y)&&!(successor.a==destination_x&&successor.b==destination_y)&&!(successor.type==GridNode.TYPE_OBSTACLE)){
+                                                successor.polygon.setFillColor(0xaaffff00);
+                                            }
+
+                                        }
+                                    });
+
+                                    try{
+                                        Thread.sleep(50);
+                                    }catch (InterruptedException ignored){};
+
+                                    bfsQueue.offer(successor);
+                                }
+
                             }
 
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    dfsPolyline=mMap.addPolyline(polylineOptions);
-                                }
-                            });
                             return 1;
                         }
 
@@ -790,9 +800,9 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                             aPolyline=null;
                         }
 
-                        if(dfsPolyline!=null){
-                            dfsPolyline.remove();
-                            dfsPolyline=null;
+                        if(bfsPolyline !=null){
+                            bfsPolyline.remove();
+                            bfsPolyline =null;
                         }
 
                         if(routePolyline!=null){
@@ -906,10 +916,10 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         }else{
                             Toasty.error(PlanPathActivity.this,"Something went wrong. Please try again.",Toast.LENGTH_LONG).show();
                         }
-                    }else if(dfsPolyline!=null){
+                    }else if(bfsPolyline !=null){
                         //Converting polypoints into string
                         String polyPointsString="";
-                        List<LatLng> points=dfsPolyline.getPoints();
+                        List<LatLng> points= bfsPolyline.getPoints();
                         for(int i=0;i<points.size();i++){
                             if(i!=points.size()-1){
                                 String point=points.get(i).latitude+"-"+points.get(i).longitude+",";
@@ -923,7 +933,7 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         FavouriteData favouriteData=new FavouriteData(
                                 txtSource.getText().toString(),
                                 txtDestination.getText().toString(),
-                                "DFS",
+                                "BFS",
                                 polyPointsString,
                                 dataPointsString,
                                 measurementsString,
@@ -976,82 +986,166 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
         });
     }
 
-    private void printNode(GridNode destination, ArrayList<TraceNode> traceNodes) {
-        for(TraceNode traceNode:traceNodes){
-            Log.d("awesome","Node: "+traceNode.node+" parent: "+traceNode.parent);
+    private void cleanGrid() {
+        if(gridList!=null&&gridList.size()!=0){
+            for(int i=0;i<gridList.size();i++){
+                for(int j=0;j<gridList.size();j++){
+                    if(gridList.get(i).get(j).type!=GridNode.TYPE_OBSTACLE){
+                        gridList.get(i).get(j).polygon.setFillColor(0x00000000);
+                    }
+                }
+            }
         }
-        Log.d("awesome","node: "+destination);
-        GridNode parent=traceNodes.get(traceNodes.indexOf(destination)).parent;
-        if(parent==null){
-            Log.d("awesome","END");
-        }else{
-            Log.d("awesome","parent: "+parent);
-            printNode(parent,traceNodes);
-        }
-
     }
 
-    private void drawPath(GridNode current) {
-        if(current.parent==null){
-            Log.d("awesome","I am the start: "+current);
-            return;
-        }
-        Log.d("awesome","current: "+current+" parent: "+current.parent);
-        drawPath(current.parent);
-        /*final PolylineOptions polylineOptions=new PolylineOptions();
-        polylineOptions.color(Color.RED).width(5.0f);
-        Log.d("awesome","At start current is: "+current+" and parent is: "+current.parent);
-        current.polygon.setFillColor(0x00000000);
+    private void drawBfsPath(final GridNode node,final PolylineOptions polylineOptions,final ArrayList<GridNode> traceList) {
+        Log.d("awesome","current: "+node+" parent:"+node.parent);
+        traceList.add(node);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                polylineOptions.add(node.getLocation());
+            }
+        });
 
-        if(current.parent!=null){
-            Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinates(
-                    current.getLocation().latitude+","+
-                            current.getLocation().longitude,
-                    current.parent.getLocation().latitude+","+
-                            current.parent.getLocation().longitude,
-                    Utils.API_KEY
-            );
+        if(node.parent==null){
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    virtualBfs=mMap.addPolyline(polylineOptions);
+
+                    Log.d("awesome","Total points: "+traceList.size());
+                    Log.d("awesome","I am the start: "+node);
+                    String waypoints="optimize:true|";
+                    for(int i=1;i<traceList.size()-1;i++){
+                        if(i==traceList.size()-2){
+                            waypoints+=traceList.get(i).getLocation().latitude+","+traceList.get(i).getLocation().longitude;
+
+                        }else{
+                            waypoints+=traceList.get(i).getLocation().latitude+","+traceList.get(i).getLocation().longitude+"|";
+                        }
+                    }
+
+                    Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinatesWithWaypoints(
+                            traceList.get(0).getLocation().latitude+","+traceList.get(0).getLocation().longitude,
+                            traceList.get(traceList.size()-1).getLocation().latitude+","+traceList.get(traceList.size()-1).getLocation().longitude,
+                            waypoints,
+                            Utils.API_KEY);
+
+                    call.enqueue(new Callback<DirectionApiResponse>() {
+                        @Override
+                        public void onResponse(Call<DirectionApiResponse> call, Response<DirectionApiResponse> response) {
+                            PolylineOptions polylineOptions=new PolylineOptions();
+                            polylineOptions.width(5.0f).color(0xff0000ff);
+                    /*List<Step> steps=response.body().getRoutes().get(0).getLegs().get(0).getSteps();
+                    for(Step step:steps){
+                        List<LatLng> points=decodePoly(step.getPolyline().getPoints());
+                        for(LatLng point:points){
+                            polylineOptions.add(point);
+                        }
+                    }*/
+
+                            polylineOptions.add(gridList.get(destination_x).get(destination_y).getLocation());
+
+                            List<LatLng> points=decodePoly(response.body().getRoutes().get(0).getOverviewPolyline().getPoints());
+                            for(LatLng point:points){
+                                polylineOptions.add(point);
+                            }
+
+                            polylineOptions.add(gridList.get(start_x).get(start_y).getLocation());
+
+                            bfsPolyline=mMap.addPolyline(polylineOptions);
+                        }
+
+                        @Override
+                        public void onFailure(Call<DirectionApiResponse> call, Throwable t) {
+
+                        }
+                    });
+
+                    return;
+
+                    //Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinatesWithWaypoints()
+                }
+            });
+        }else{
+            drawBfsPath(node.parent,polylineOptions,traceList);
+        }
+    }
+
+    private void drawAPath(GridNode current, PolylineOptions normalLine, ArrayList<GridNode> traceList) {
+        traceList.add(current);
+        if(current.parent==null){
+            Log.d("awesome","Total points: "+traceList.size());
+            Log.d("awesome","I am the start: "+current);
+            String waypoints="optimize:true|";
+            for(int i=1;i<traceList.size()-1;i++){
+                if(i==traceList.size()-2){
+                    waypoints+=traceList.get(i).getLocation().latitude+","+traceList.get(i).getLocation().longitude;
+
+                }else{
+                    waypoints+=traceList.get(i).getLocation().latitude+","+traceList.get(i).getLocation().longitude+"|";
+                }
+            }
+
+            Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinatesWithWaypoints(
+                    traceList.get(0).getLocation().latitude+","+traceList.get(0).getLocation().longitude,
+                    traceList.get(traceList.size()-1).getLocation().latitude+","+traceList.get(traceList.size()-1).getLocation().longitude,
+                    waypoints,
+                    Utils.API_KEY);
 
             call.enqueue(new Callback<DirectionApiResponse>() {
                 @Override
                 public void onResponse(Call<DirectionApiResponse> call, Response<DirectionApiResponse> response) {
-                    List<Step> steps=response.body().getRoutes().get(0).getLegs().get(0).getSteps();
+                    PolylineOptions polylineOptions=new PolylineOptions();
+                    polylineOptions.width(5.0f).color(0xff0000ff);
+                    /*List<Step> steps=response.body().getRoutes().get(0).getLegs().get(0).getSteps();
                     for(Step step:steps){
                         List<LatLng> points=decodePoly(step.getPolyline().getPoints());
-                        for(LatLng latLng:points){
-                            polylineOptions.add(latLng);
+                        for(LatLng point:points){
+                            polylineOptions.add(point);
                         }
+                    }*/
+
+                    polylineOptions.add(gridList.get(destination_x).get(destination_y).getLocation());
+
+                    List<LatLng> points=decodePoly(response.body().getRoutes().get(0).getOverviewPolyline().getPoints());
+                    for(LatLng point:points){
+                        polylineOptions.add(point);
                     }
+
+                    polylineOptions.add(gridList.get(start_x).get(start_y).getLocation());
+
+                    aPolyline=mMap.addPolyline(polylineOptions);
                 }
 
                 @Override
                 public void onFailure(Call<DirectionApiResponse> call, Throwable t) {
-                    Toasty.error(PlanPathActivity.this,"Something went wrong while drawing path. Please try again.",Toast.LENGTH_LONG);
+
                 }
             });
 
-            if(dfsPolyline!=null){
-                dfsPolyline.remove();
-            }
-            dfsPolyline=mMap.addPolyline(polylineOptions);
-
-            drawPath(current.parent);
-        }else{
-            Log.d("awesome","Reached the end of A*");
-            Toasty.success(PlanPathActivity.this,"A* algorithm applied successfully");
+            return;
         }
-*/
 
+        //Add simple line
+        normalLine.add(current.getLocation(),current.parent.getLocation());
+        Log.d("awesome","current: "+current+" parent: "+current.parent);
+        virtualA=mMap.addPolyline(normalLine);
+
+
+        drawAPath(current.parent,normalLine,traceList);
     }
 
-    private ArrayList<GridNode> getSuccessors(GridNode q,int a, int b) {
+    private ArrayList<GridNode> getSuccessors(GridNode q) {
+        int a=q.a;
+        int b=q.b;
         ArrayList<GridNode> successorList=new ArrayList<>();
         for(int x=a-1;x<=a+1;x++){
             for(int y=b-1;y<=b+1;y++){
                 if(!(x==a&&y==b)){
                     GridNode successor=getSuccessor(x,y);
                     if(successor!=null){
-                        successor.parent=q;
                         successorList.add(successor);
                     }
                 }else{
@@ -1085,40 +1179,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             return true;
         }
         return false;
-    }
-
-    private int algoDFS(Node node,Node destinationNode) {
-        node.setVisited(true);
-        if(node==destinationNode){
-            return 0;
-        }else{
-
-            int minimumDistance=0;
-            Node minimumNode=null;
-            for(Node adjacentNode:node.getAdjacencyList()){
-                if(adjacentNode.isVisited()){
-                    continue;
-                }
-                try{
-                    Call<DirectionApiResponse> call=ApiClient.getClient().getPathCoordinates(
-                            node.getLatLng().latitude+","+node.getLatLng().longitude,
-                            adjacentNode.getLatLng().latitude+","+adjacentNode.getLatLng().longitude,
-                            Utils.API_KEY
-                    );
-
-                    DirectionApiResponse directionApiResponse=call.execute().body();
-                    int totalDistance=algoDFS(adjacentNode,destinationNode)+directionApiResponse.getRoutes().get(0).getLegs().get(0).getDistance().getValue();
-                    if(totalDistance<minimumDistance||minimumDistance==0){
-                        minimumDistance=totalDistance;
-                        minimumNode=adjacentNode;
-                    }
-                }catch (Exception e){
-                    Log.d("awesome","Exception in finding distance: "+e.toString());
-                }
-            }
-            node.setChild(minimumNode);
-            return minimumDistance;
-        }
     }
 
     private boolean betterNodeExists(ArrayList<Node> nodeArrayList, Node n) {
@@ -1242,8 +1302,14 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
         geoLocate = new GeoLocate(mMap, PlanPathActivity.this, mGoogleApiClient);
         GPSTracker gpsTracker=new GPSTracker(PlanPathActivity.this);
         Location location=gpsTracker.getLocation();
-        gotoLocation(location.getLatitude(),location.getLongitude());
-        mapGrid=new MapGrid(mMap);
+        if(location!=null){
+            gotoLocation(location.getLatitude(),location.getLongitude());
+            mapGrid=new MapGrid(mMap);
+        }else{
+            Toasty.error(PlanPathActivity.this,"Unable to get location from GPS",Toast.LENGTH_LONG).show();
+            finish();
+        }
+
 
         Handler handler=new Handler();
         handler.postDelayed(new Runnable() {
@@ -1309,7 +1375,6 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                         Log.d("awesome","Destination: "+destination);
                         txtDestination.setText(destination);
                     }else{
-                        mMap.clear();
                         markerSource.remove();
                         markerSource=null;
                         markerDestination.remove();
@@ -1337,6 +1402,10 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
         Log.d("awesome","start: "+start);
         Log.d("awesome","destination: "+destination);
         mapGrid.drawGrid(start,destination,CLUSTER_SIZE);
+        if(mapGrid==null){
+            Toasty.error(PlanPathActivity.this,"Unable to draw fetch Map. Please check GPS settings.",Toast.LENGTH_LONG).show();
+            finish();
+        }
         gridList=mapGrid.getGridList();
 
         Double minValue;
@@ -1378,13 +1447,11 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
                             gridList.get(a).get(b).polygon.setFillColor(Utils.hex2Decimal(alpha+"0000FF"));
                             gridList.get(a).get(b).type=GridNode.TYPE_OBSTACLE;
                             break;
-
                         }
                     }
                 }else{
                     break;
                 }
-
             }
         }
     }
@@ -1549,9 +1616,9 @@ public class PlanPathActivity extends AppCompatActivity implements OnMapReadyCal
             aPolyline=null;
         }
 
-        if(dfsPolyline!=null){
-            dfsPolyline.remove();
-            dfsPolyline=null;
+        if(bfsPolyline !=null){
+            bfsPolyline.remove();
+            bfsPolyline =null;
         }
 
         if(markerSource!=null){

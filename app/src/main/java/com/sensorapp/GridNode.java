@@ -25,6 +25,8 @@ public class GridNode {
     public int a=-1;
     public int b=-1;
     public GridNode parent;
+    public Boolean opened=false;
+    public Boolean closed=false;
 
     public LatLng getLocation(){
         Double avgLatitude=0.0d;
@@ -38,6 +40,10 @@ public class GridNode {
         avgLongitude=avgLongitude/4;
 
         return new LatLng(avgLatitude,avgLongitude);
+    }
+
+    public Double getF(){
+        return g+h;
     }
 
 }

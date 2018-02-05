@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -26,6 +27,8 @@ import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import es.dmoral.toasty.Toasty;
 
 public class FavouriteRouteViewActivity extends AppCompatActivity {
     private View view;
@@ -71,6 +74,12 @@ public class FavouriteRouteViewActivity extends AppCompatActivity {
     private void continueExecution(){
         DatabaseHelper databaseHelper=new DatabaseHelper(FavouriteRouteViewActivity.this);
         favouriteData=databaseHelper.getFavouriteRouteById(getIntent().getIntExtra(FavouritesAdapter.FAVOURITE_ROUTE_ID,0));
+
+        if(favouriteData==null){
+            Toasty.error(FavouriteRouteViewActivity.this,"Unable to fetch favourite data from database!", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         type=favouriteData.getType();
         polylineOptions=new PolylineOptions().width(5);
         if(favouriteData.getType().equalsIgnoreCase(DashBoardActivity.DATA_TYPE_NOISE)){
